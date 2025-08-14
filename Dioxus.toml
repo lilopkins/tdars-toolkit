@@ -3,7 +3,7 @@
 [web.app]
 
 # HTML title tag content
-title = "tdars-toolkit-rs"
+title = "TDARS Toolkit"
 
 # include `assets` in web platform
 [web.resource]
