@@ -142,7 +142,7 @@ impl Datafile {
     }
 
     /// Reconcile the callsign by the amount. Returns the amount remaining, i.e. change.
-    pub fn reconcile(&mut self, callsign: Callsign, mut amount: BigDecimal) -> BigDecimal {
+    pub fn reconcile(&mut self, callsign: Callsign, mut amount: BigDecimal, all_funds_to_club: bool) -> BigDecimal {
         self.audit_log.push(AuditEntry::new(AuditItem::Reconciled {
             callsign: callsign.clone(),
             amount: amount.clone(),
@@ -157,6 +157,7 @@ impl Datafile {
                     let amt_less_club: BigDecimal = sold.hammer_price() * (1 - ct.clone());
                     amount += amt_less_club.clone();
                     sold.seller_reconciled = amt_less_club;
+                    sold.seller_all_funds_to_club = all_funds_to_club;
                 }
             }
         });
@@ -211,6 +212,7 @@ impl Item {
             buyer_callsign,
             buyer_reconciled: BigDecimal::zero(),
             seller_reconciled: BigDecimal::zero(),
+            seller_all_funds_to_club: false,
         });
         self
     }
@@ -227,6 +229,9 @@ pub struct SoldDetails {
     buyer_reconciled: BigDecimal,
     /// How much has the seller reconciled against this item?
     seller_reconciled: BigDecimal,
+    /// Indicates that the seller opted for all revenue to go to the
+    /// club
+    seller_all_funds_to_club: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Getters)]

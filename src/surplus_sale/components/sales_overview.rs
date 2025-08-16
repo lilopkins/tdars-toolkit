@@ -5,6 +5,7 @@ use crate::surplus_sale::types::Datafile;
 #[component]
 pub fn SalesOverview() -> Element {
     let datafile: Signal<Datafile> = use_context();
+    // TODO Allow entries to be revoked so they can be re-entered.
 
     rsx! {
         table { class: "table",

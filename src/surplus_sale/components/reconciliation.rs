@@ -70,6 +70,7 @@ pub fn Reconciliation() -> Element {
 
     // TODO Resolve partial reconciliation
     // TODO Resolve change
+    // TODO Add all funds to club button
 
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "1rem",
@@ -115,7 +116,7 @@ pub fn Reconciliation() -> Element {
                             } else {
                                 reconcile_amount()
                             };
-                            let change = datafile.write().reconcile(callsign(), amt);
+                            let change = datafile.write().reconcile(callsign(), amt, false);
                             if !change.is_zero() {
                                 toast_api
                                     .info(
