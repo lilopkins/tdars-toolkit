@@ -1,3 +1,8 @@
+#![warn(clippy::pedantic)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::unwrap_used)]
+#![cfg_attr(feature = "bundle", windows_subsystem = "windows")]
+
 // The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you
 // need dioxus
 use dioxus::prelude::*;
@@ -5,7 +10,8 @@ use dioxus::prelude::*;
 use surplus_sale::prelude::*;
 use views::{Home, Navbar};
 
-/// Define a views module that contains the UI for all Layouts and Routes for our app.
+mod components;
+mod types;
 mod views;
 
 /// Modules for the TDARS Toolkit

@@ -464,3 +464,388 @@
 .toast-close:hover {
   color: var(--secondary-color-1);
 }
+
+/* Input */
+.input {
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 0.5rem;
+  border-radius: calc(0.5rem);
+  background: none;
+  background: var(--light, var(--primary-color))
+    var(--dark, var(--primary-color-3));
+  box-shadow: inset 0 0 0 1px var(--light, var(--primary-color-6))
+    var(--dark, var(--primary-color-7));
+  color: var(--secondary-color-4);
+  cursor: pointer;
+  gap: 0.25rem;
+  transition: background-color 100ms ease-out;
+}
+
+.input::placeholder {
+  color: var(--secondary-color-5);
+}
+
+.input:disabled {
+  color: var(--secondary-color-5);
+  cursor: not-allowed;
+}
+
+.input:hover:not(:disabled),
+.input:focus-visible {
+  background: var(--light, var(--primary-color-4))
+    var(--dark, var(--primary-color-5));
+  color: var(--secondary-color-1);
+  outline: none;
+}
+
+/* Label */
+.label {
+  display: flex;
+  align-items: center;
+  color: var(--secondary-color-4);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+/* Popover */
+.popover {
+  position: relative;
+  display: inline-block;
+}
+
+.popover-content {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  min-width: 200px;
+  max-width: calc(100% - 2rem);
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: .25rem;
+  border-radius: .5rem;
+  margin-top: .5rem;
+  background: var(--light, var(--primary-color))
+      var(--dark, var(--primary-color-5));
+  box-shadow: inset 0 0 0 1px var(--light, var(--primary-color-6)) var(--dark, var(--primary-color-7));
+  text-align: center;
+  transform: translate(-50%, -50%);
+  transform-origin: top;
+  will-change: transform, opacity;
+}
+
+.popover-content[data-state="closed"] {
+  display: none;
+}
+
+.popover-content[data-state="open"] {
+  display: flex;
+  animation: popover-fade-in .2s ease-in-out;
+}
+
+@keyframes popover-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Positioning based on side */
+.popover-content[data-side="top"] {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 8px;
+  transform: translateX(-50%);
+}
+
+.popover-content[data-side="top"]::after {
+  top: calc(100% - 0.25rem);
+  left: 50%;
+  border-color: var(--secondary-color-4);
+  border-radius: 0 0 0.1rem;
+}
+
+.popover-content[data-side="right"] {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  margin-left: 8px;
+  transform: translateY(-50%);
+}
+
+.popover-content[data-side="right"]::after {
+  top: calc(50% - 0.25rem);
+  left: 0;
+  border-color: var(--secondary-color-4);
+  border-radius: 0 0 0 0.1rem;
+}
+
+.popover-content[data-side="bottom"] {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 8px;
+  transform: translateX(-50%);
+}
+
+.popover-content[data-side="bottom"]::after {
+  bottom: calc(100% - 0.25rem);
+  left: 50%;
+  border-color: var(--secondary-color-4);
+  border-radius: 0.1rem 0 0;
+}
+
+.popover-content[data-side="left"] {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  margin-right: 8px;
+  transform: translateY(-50%);
+}
+
+.popover-content[data-side="left"]::after {
+  top: calc(50% - 0.25rem);
+  right: -0.25rem;
+  border-color: var(--secondary-color-4);
+  border-radius: 0 0.1rem 0 0;
+}
+
+/* Alignment styles for top and bottom */
+.popover-content[data-side="top"][data-align="start"],
+.popover-content[data-side="bottom"][data-align="start"] {
+  left: 0;
+  transform: none;
+}
+
+.popover-content[data-side="top"][data-align="end"],
+.popover-content[data-side="bottom"][data-align="end"] {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+/* Alignment styles for left and right */
+.popover-content[data-side="left"][data-align="start"],
+.popover-content[data-side="right"][data-align="start"] {
+  top: 0;
+  transform: none;
+}
+
+.popover-content[data-side="left"][data-align="center"],
+.popover-content[data-side="right"][data-align="center"] {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.popover-content[data-side="left"][data-align="end"],
+.popover-content[data-side="right"][data-align="end"] {
+  top: auto;
+  bottom: 0;
+  transform: none;
+}
+
+.popover-content-title {
+  margin: 0;
+  color: var(--secondary-color-4);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.popover-content-description {
+  margin: 0;
+  color: var(--secondary-color-5);
+  font-size: 1rem;
+}
+
+.popover-content-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 12px;
+}
+
+@media (width >= 40rem) {
+  .popover-content-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .popover-content {
+    max-width: 32rem;
+    text-align: left;
+  }
+}
+
+.popover-content-cancel {
+  padding: 8px 18px;
+  border: 1px solid var(--primary-color-6);
+  border-radius: 0.5rem;
+  background-color: var(--light, var(--primary-color))
+    var(--dark, var(--primary-color-3));
+  color: var(--secondary-color-4);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.popover-content-cancel:hover {
+  background-color: var(--primary-color-4);
+}
+
+.popover-content-cancel:focus-visible {
+  box-shadow: 0 0 0 2px var(--focused-border-color);
+}
+
+.popover-content-action {
+  padding: 8px 18px;
+  border: 1px solid var(--primary-error-color);
+  border-radius: 0.5rem;
+  background-color: var(--primary-error-color);
+  color: var(--contrast-error-color);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.popover-content-action:hover {
+  background-color: var(--secondary-error-color);
+}
+
+.popover-content-action:focus-visible {
+  box-shadow: 0 0 0 2px var(--focused-border-color);
+}
+
+.popover-trigger {
+  padding: 8px 18px;
+  border: 1px solid var(--primary-color-6);
+  border-radius: 0.5rem;
+  background-color: var(--light, var(--primary-color))
+    var(--dark, var(--primary-color-3));
+  color: var(--secondary-color-4);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.popover-trigger:hover {
+  background-color: var(--primary-color-4);
+}
+
+.popover-trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--focused-border-color);
+}
+
+/* Dialog */
+.dialog-backdrop {
+  position: fixed;
+  z-index: 1000;
+  background: rgb(0 0 0 / 30%);
+  inset: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.dialog-backdrop[data-state="closed"] {
+  pointer-events: none;
+  animation: dialog-backdrop-animate-out 150ms ease-in forwards;
+}
+
+@keyframes dialog-backdrop-animate-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-2px);
+  }
+}
+
+.dialog-backdrop[data-state="open"] {
+  animation: dialog-content-animate-in 150ms ease-out forwards;
+}
+
+@keyframes dialog-content-animate-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Dialog Container - improved for theme consistency */
+.dialog {
+  position: fixed;
+  z-index: 1001;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: 100%;
+  max-width: calc(100% - 2rem);
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: 32px 24px 24px;
+  border: 1px solid var(--primary-color-6);
+  border-radius: 8px;
+  margin: 0;
+  background: var(--primary-color-2);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 18%);
+  color: var(--secondary-color-4);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  gap: 16px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.dialog-title {
+  margin: 0;
+  color: var(--secondary-color-4);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.dialog-description {
+  margin: 0;
+  color: var(--secondary-color-5);
+  font-size: 1rem;
+}
+
+@media (width >= 40rem) {
+  .dialog {
+    max-width: 32rem;
+    text-align: left;
+  }
+}
+
+.dialog-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  margin: 0;
+  background: none;
+  color: var(--secondary-color-3);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.dialog-close:hover {
+  color: var(--secondary-color-1);
+}

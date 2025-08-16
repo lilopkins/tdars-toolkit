@@ -2,7 +2,6 @@ use dioxus::prelude::*;
 
 use crate::Route;
 
-/// The Home page component that will be rendered when the current route is `[Route::Home]`
 #[component]
 pub fn Home() -> Element {
     rsx! {
@@ -14,7 +13,6 @@ pub fn Home() -> Element {
             }
 
             Link { to: Route::SurplusSale {},
-
                 button { class: "fat wide button", "data-style": "outline", "Run a Surplus Sale" }
             }
         }

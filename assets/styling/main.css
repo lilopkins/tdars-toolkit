@@ -8,6 +8,7 @@
   max-width: 800px;
 }
 
+/* Text Selection */
 .select {
   -webkit-user-select: auto;
   -ms-user-select: auto;
@@ -20,6 +21,7 @@
   user-select: none;
 }
 
+/* Button Variations */
 .button.fat {
   padding: 16px 32px !important;
   margin-bottom: 8px;
@@ -27,4 +29,33 @@
 
 .button.wide {
   width: 100%;
+}
+
+/* Tables */
+.table {
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.table thead tr {
+  background-color: var(--secondary-color-4);
+  color: var(--primary-color);
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 12px 15px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--secondary-color-3);
+}
+
+.table tbody tr:nth-of-type(even) {
+  background-color: var(--primary-color-5);
+}
+
+.table tbody tr:last-of-type {
+  border-bottom: 2px solid var(--secondary-color-4);
 }
