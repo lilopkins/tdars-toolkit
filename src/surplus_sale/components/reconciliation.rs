@@ -167,13 +167,15 @@ pub fn Reconciliation() -> Element {
                 }
                 tbody {
                     if let Some(liability) = liability() {
-                        tr {
-                            td {}
-                            td {
-                                em { "Unpaid owing" }
+                        if !liability.is_zero() {
+                            tr {
+                                td {}
+                                td {
+                                    em { "Unpaid owing" }
+                                }
+                                td { "-{sym} {liability:0.02}" }
+                                td { "-{sym} {liability:0.02}" }
                             }
-                            td { "-{sym} {liability:0.02}" }
-                            td { "-{sym} {liability:0.02}" }
                         }
                     }
                     for item in &items_bought() {
