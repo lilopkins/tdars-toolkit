@@ -47,6 +47,9 @@ pub fn Configure(props: ConfigureProps) -> Element {
                     input {
                         class: "input",
                         r#type: "number",
+                        min: "0",
+                        step: "0.1",
+                        max: "100",
                         id: "club-percentage",
                         value: "{club_taking}",
                         oninput: move |e| {

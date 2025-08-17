@@ -35,6 +35,32 @@ pub fn Auction() -> Element {
     let mut buyer = use_signal(Callsign::default);
     let mut hammer_price = use_signal(BigDecimal::zero);
 
+    let sell_item = move |sold| async move {
+        // Set file needs saving
+        needs_saving.set(NeedsSaving(true));
+
+        if sold {
+            // Save sale
+            let mut item = Item::new(lot_number(), seller(), item_description());
+            item.sold(hammer_price(), buyer());
+            datafile.write().push_item(item);
+        } else {
+            // Save not sold
+            datafile
+                .write()
+                .push_item(Item::new(lot_number(), seller(), item_description()));
+        }
+
+        // Reset sale fields
+        seller.set(Callsign::default());
+        item_description.set(String::new());
+        hammer_price.set(BigDecimal::zero());
+        buyer.set(Callsign::default());
+        if let Some(seller_callsign_elem) = seller_callsign_elem() {
+            _ = seller_callsign_elem.set_focus(true).await;
+        }
+    };
+
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "1rem",
             div { display: "flex", flex_direction: "column", gap: ".5rem",
@@ -77,23 +103,7 @@ pub fn Auction() -> Element {
                         class: "button",
                         "data-style": "secondary",
                         onclick: move |_| async move {
-                            // Set file needs saving
-                            needs_saving.set(NeedsSaving(true));
-
-                            // Save not sold
-                            datafile
-                                .write()
-
-                                // Reset sale fields
-
-                                .push_item(Item::new(lot_number(), seller(), item_description()));
-                            seller.set(Callsign::default());
-                            item_description.set(String::new());
-                            hammer_price.set(BigDecimal::zero());
-                            buyer.set(Callsign::default());
-                            if let Some(seller_callsign_elem) = seller_callsign_elem() {
-                                _ = seller_callsign_elem.set_focus(true).await;
-                            }
+                            sell_item(false).await;
                         },
                         "Item not sold"
                     }
@@ -115,11 +125,19 @@ pub fn Auction() -> Element {
                         input {
                             class: "input",
                             id: "hammer-price",
+                            r#type: "number",
+                            step: "0.01",
+                            min: "0",
                             placeholder: "123.45",
                             value: "{hammer_price}",
-                            onchange: move |e| {
+                            oninput: move |e| {
                                 if let Ok(p) = BigDecimal::from_str(&e.value()) {
                                     hammer_price.set(p);
+                                }
+                            },
+                            onkeyup: move |e| async move {
+                                if e.key() == Key::Enter {
+                                    sell_item(true).await;
                                 }
                             },
                         }
@@ -128,23 +146,7 @@ pub fn Auction() -> Element {
                         class: "button",
                         "data-style": "primary",
                         onclick: move |_| async move {
-                            // Set file needs saving
-                            needs_saving.set(NeedsSaving(true));
-
-                            // Save sale
-
-                            // Reset sale fields
-
-                            let mut item = Item::new(lot_number(), seller(), item_description());
-                            item.sold(hammer_price(), buyer());
-                            datafile.write().push_item(item);
-                            seller.set(Callsign::default());
-                            item_description.set(String::new());
-                            hammer_price.set(BigDecimal::zero());
-                            buyer.set(Callsign::default());
-                            if let Some(seller_callsign_elem) = seller_callsign_elem() {
-                                _ = seller_callsign_elem.set_focus(true).await;
-                            }
+                            sell_item(true).await;
                         },
                         "Item sold"
                     }

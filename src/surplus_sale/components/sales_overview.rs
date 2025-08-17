@@ -21,8 +21,7 @@ pub fn SalesOverview() -> Element {
                     th { "Seller" }
                     th { "Sold for" }
                     th { "Buyer" }
-                    th { "S reconciled" }
-                    th { "B reconciled" }
+                    th { "Reconciled (S/B)" }
                     th {}
                 }
             }
@@ -54,34 +53,37 @@ pub fn SalesOverview() -> Element {
                         if let Some(sold) = item.sold_details() {
                             td { "{sym} {sold.hammer_price():0.02}" }
                             td { "{sold.buyer_callsign()}" }
-                            if *sold.seller_reconciled() {
-                                td { "✅" }
-                            } else {
-                                td { "❌" }
-                            }
-                            if *sold.buyer_reconciled() {
-                                td { "✅" }
-                            } else {
-                                td { "❌" }
-                            }
-                            if *sold.buyer_reconciled() || *sold.seller_reconciled() {
-                                td {}
-                            } else {
-                                td {
-                                    button {
-                                        class: "button",
-                                        "data-style": "outline",
-                                        onclick: {
-                                            let lot_nmr = item.lot_number().clone();
-                                            move |_| delete_item(lot_nmr.clone())
-                                        },
-                                        "Revoke"
-                                    }
+                            td {
+                                if *sold.seller_reconciled() {
+                                    "✅"
+                                } else {
+                                    "❌"
+                                }
+                                " / "
+                                if *sold.buyer_reconciled() {
+                                    "✅"
+                                } else {
+                                    "❌"
                                 }
                             }
                         } else {
-                            td { colspan: 4, "Item not sold." }
+                            td { colspan: 3, "Item not sold." }
+                        }
+
+                        if item.sold_details().as_ref().is_some_and(|sold| *sold.buyer_reconciled() || *sold.seller_reconciled()) {
                             td {}
+                        } else {
+                            td {
+                                button {
+                                    class: "button",
+                                    "data-style": "outline",
+                                    onclick: {
+                                        let lot_nmr = item.lot_number().clone();
+                                        move |_| delete_item(lot_nmr.clone())
+                                    },
+                                    "Revoke"
+                                }
+                            }
                         }
                     }
                 }
