@@ -1,19 +1,11 @@
-use std::hash::{Hash, Hasher};
+use std::hash::Hasher;
 
 use derive_more::Display;
 use getset::{Getters, MutGetters, Setters, WithSetters};
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Serialize,
-    Deserialize,
-    Clone,
-    Display,
-    Default,
-    Getters,
-    MutGetters,
-    Setters,
-    WithSetters,
+    Serialize, Deserialize, Clone, Display, Default, Getters, MutGetters, Setters, WithSetters,
 )]
 #[display("{callsign} {name}")]
 #[getset(get = "pub", get_mut = "pub", set = "pub", set_with = "pub")]

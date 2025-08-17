@@ -1,5 +1,18 @@
 [application]
 
+[bundle]
+name = "TDARS Toolkit"
+identifier = "uk.hpkns"
+publisher = "Hpkns"
+icon = [
+    "icon.png",
+    "icon.ico",
+    "icon.icns",
+]
+category = "Utility"
+short_description = "Tools for TDARS"
+long_description = "A collection of tools and utilities for the Telford and District Amateur Radio Society"
+
 [web.app]
 
 # HTML title tag content
