@@ -31,6 +31,11 @@
   width: 100%;
 }
 
+.button[disabled] {
+  cursor: not-allowed;
+  filter: opacity(70%) brightness(40%);
+}
+
 /* Tables */
 .table {
   border-collapse: collapse;

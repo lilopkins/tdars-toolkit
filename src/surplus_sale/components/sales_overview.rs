@@ -76,7 +76,7 @@ pub fn SalesOverview() -> Element {
                             td {
                                 button {
                                     class: "button",
-                                    "data-style": "outline",
+                                    "data-style": "destructive",
                                     onclick: {
                                         let lot_nmr = item.lot_number().clone();
                                         move |_| delete_item(lot_nmr.clone())

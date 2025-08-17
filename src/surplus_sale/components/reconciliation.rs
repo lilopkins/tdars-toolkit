@@ -130,6 +130,7 @@ pub fn Reconciliation() -> Element {
                 div { align_content: "end", margin_left: ".4rem",
                     button {
                         class: "button",
+                        disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
                         onclick: move |_| reconcile(false),
                         "Reconcile"
@@ -138,6 +139,7 @@ pub fn Reconciliation() -> Element {
                 div { align_content: "end", margin_left: ".4rem",
                     button {
                         class: "button",
+                        disabled: total() >= BigDecimal::zero(),
                         "data-style": "primary",
                         onclick: move |_| reconcile(true),
                         "Revenue to Club"
