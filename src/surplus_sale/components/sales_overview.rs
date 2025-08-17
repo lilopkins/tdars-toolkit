@@ -1,3 +1,4 @@
+use bigdecimal::Zero;
 use dioxus::prelude::*;
 
 use crate::surplus_sale::types::Datafile;
@@ -16,11 +17,25 @@ pub fn SalesOverview() -> Element {
                     th { "Seller" }
                     th { "Sold for" }
                     th { "Buyer" }
-                    th { "Seller reconciled" }
-                    th { "Buyer reconciled" }
+                    th { "S reconciled" }
+                    th { "B reconciled" }
                 }
             }
             tbody {
+                for (callsign , liability) in datafile.read().callsign_liabilities() {
+                    if !liability.is_zero() {
+                        tr { key: "{callsign}",
+                            td {}
+                            td {
+                                em { "Unpaid amounts" }
+                            }
+                            td {}
+                            td { "{liability:0.02}" }
+                            td { "{callsign}" }
+                            td { colspan: 2 }
+                        }
+                    }
+                }
                 if datafile.read().items().is_empty() {
                     tr {
                         td { colspan: 7, "No items sold yet..." }
@@ -34,12 +49,12 @@ pub fn SalesOverview() -> Element {
                         if let Some(sold) = item.sold_details() {
                             td { "{sold.hammer_price():0.02}" }
                             td { "{sold.buyer_callsign()}" }
-                            if *sold.seller_reconciled() == (sold.hammer_price() * (1 - datafile().club_taking())) {
+                            if *sold.seller_reconciled() {
                                 td { "✅" }
                             } else {
                                 td { "{sold.seller_reconciled():0.02}" }
                             }
-                            if sold.buyer_reconciled() == sold.hammer_price() {
+                            if *sold.buyer_reconciled() {
                                 td { "✅" }
                             } else {
                                 td { "{sold.buyer_reconciled():0.02}" }

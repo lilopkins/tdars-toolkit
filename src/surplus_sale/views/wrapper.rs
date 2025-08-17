@@ -146,32 +146,32 @@ pub fn SurplusSale() -> Element {
                         on_select: move |_| async move {
                             tracing::info!("Saving...");
 
-                                #[allow(
-                                    // Button is disabled when this doesn't unwrap
-                                    clippy::unwrap_used,
-                                    reason = "the ability to serialise the datafile is guaranteed"
-                                )]
-                                let data = rmp_serde::to_vec(&datafile()).unwrap();
-                                let date = Local::now().date_naive();
-                                if let Some(path) = rfd::AsyncFileDialog::new()
-                                    .add_filter("TDARS auction", &["tdars_auction"])
-                                    .set_file_name(format!("{date}.tdars_auction"))
-                                    .save_file()
-                                    .await
-                                {
-                                    if let Err(e) = path.write(&data).await {
-                                        toast_api
-                                            .error(
-                                                "Failed to save".to_string(),
-                                                ToastOptions::new()
-                                                    .description(format!("{e}"))
-                                                    .permanent(false)
-                                                    .duration(ERROR_DURATION),
-                                            );
-                                    } else {
-                                        needs_saving.set(NeedsSaving(false));
-                                    }
+                            #[allow(
+                                // Button is disabled when this doesn't unwrap
+                                clippy::unwrap_used,
+                                reason = "the ability to serialise the datafile is guaranteed"
+                            )]
+                            let data = rmp_serde::to_vec(&datafile()).unwrap();
+                            let date = Local::now().date_naive();
+                            if let Some(path) = rfd::AsyncFileDialog::new()
+                                .add_filter("TDARS auction", &["tdars_auction"])
+                                .set_file_name(format!("{date}.tdars_auction"))
+                                .save_file()
+                                .await
+                            {
+                                if let Err(e) = path.write(&data).await {
+                                    toast_api
+                                        .error(
+                                            "Failed to save".to_string(),
+                                            ToastOptions::new()
+                                                .description(format!("{e}"))
+                                                .permanent(false)
+                                                .duration(ERROR_DURATION),
+                                        );
+                                } else {
+                                    needs_saving.set(NeedsSaving(false));
                                 }
+                            }
 
                         },
                         "Save"

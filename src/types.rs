@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 use derive_more::Display;
 use getset::{Getters, MutGetters, Setters, WithSetters};
 use serde::{Deserialize, Serialize};
@@ -6,7 +8,6 @@ use serde::{Deserialize, Serialize};
     Serialize,
     Deserialize,
     Clone,
-    PartialEq,
     Display,
     Default,
     Getters,
@@ -22,4 +23,21 @@ pub struct Callsign {
     callsign: String,
     /// The individual's name.
     name: String,
+}
+
+impl std::cmp::PartialEq for Callsign {
+    fn eq(&self, other: &Self) -> bool {
+        self.callsign == other.callsign
+    }
+}
+
+impl std::cmp::Eq for Callsign {}
+
+impl std::hash::Hash for Callsign {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.callsign.hash(state);
+    }
 }

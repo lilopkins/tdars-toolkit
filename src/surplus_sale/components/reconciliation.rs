@@ -22,6 +22,9 @@ pub fn Reconciliation() -> Element {
     let callsign = use_signal(Callsign::default);
     let mut reconcile_amount = use_signal(BigDecimal::zero);
 
+    let liability = use_memo(move || {
+        datafile.read().callsign_liabilities().get(&callsign()).cloned().clone()
+    });
     let items_sold = use_memo(move || {
         datafile
             .read()
@@ -30,8 +33,7 @@ pub fn Reconciliation() -> Element {
             .filter(|i| {
                 *i.seller_callsign() == callsign()
                     && i.sold_details().as_ref().is_some_and(|s| {
-                        *s.seller_reconciled()
-                            != (s.hammer_price() * (1 - datafile().club_taking()))
+                        !s.seller_reconciled()
                     })
             })
             .cloned()
@@ -44,24 +46,25 @@ pub fn Reconciliation() -> Element {
             .iter()
             .filter(|i| {
                 i.sold_details().as_ref().is_some_and(|s| {
-                    *s.buyer_callsign() == callsign() && s.buyer_reconciled() != s.hammer_price()
+                    *s.buyer_callsign() == callsign() && !s.buyer_reconciled()
                 })
             })
             .cloned()
             .collect::<Vec<_>>()
     });
+
+    // + => callsign pays club
+    // - => club pays callsign
     let total = use_memo(move || {
-        let mut total = BigDecimal::zero();
+        let mut total = liability().unwrap_or_else(BigDecimal::zero);
         for item in &items_bought() {
             if let Some(sold) = item.sold_details() {
                 total -= sold.hammer_price();
-                total += sold.buyer_reconciled();
             }
         }
         for item in &items_sold() {
             if let Some(sold) = item.sold_details() {
                 total += sold.hammer_price() * (1 - datafile().club_taking());
-                total -= sold.seller_reconciled();
             }
         }
         total
@@ -83,9 +86,6 @@ pub fn Reconciliation() -> Element {
         }
         needs_saving.set(NeedsSaving(true));
     };
-
-    // TODO Resolve partial reconciliation
-    // TODO Resolve change
 
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "1rem",
@@ -160,6 +160,14 @@ pub fn Reconciliation() -> Element {
                     }
                 }
                 tbody {
+                    if let Some(liability) = liability() {
+                        tr {
+                            td {}
+                            td { em { "Unpaid owing" } }
+                            td { "{liability:0.02}" }
+                            td { "{liability:0.02}" }
+                        }
+                    }
                     for item in &items_bought() {
                         tr {
                             td { "{item.lot_number()}" }

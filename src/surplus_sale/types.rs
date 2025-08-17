@@ -1,6 +1,7 @@
 #![allow(clippy::ref_option)]
 
 use std::{fmt, str::FromStr};
+use std::collections::HashMap;
 
 use bigdecimal::{BigDecimal, Zero};
 use chrono::{DateTime, Local};
@@ -26,6 +27,8 @@ pub struct Datafile {
     callsigns: Vec<Callsign>,
     /// A sorted (by lot number) list of items from the auction
     items: Vec<Item>,
+    /// A map of callsigns that still owe amounts
+    callsign_liabilities: HashMap<Callsign, BigDecimal>,
     /// A list of entries for an audit log
     audit_log: Vec<AuditEntry>,
 }
@@ -42,6 +45,7 @@ impl Datafile {
             currency,
             callsigns: vec![],
             items: vec![],
+            callsign_liabilities: HashMap::new(),
             audit_log: vec![AuditEntry::new(AuditItem::Created {
                 currency: currency,
                 club_taking_pct: club_taking * 100,
@@ -142,47 +146,70 @@ impl Datafile {
     }
 
     /// Reconcile the callsign by the amount. Returns the amount remaining, i.e. change.
+    ///
+    /// If the club pays out, `reconcile_amount` should be negative. Inverseley if the
+    /// club takes money, `reconcile_amount` should be positive.
     pub fn reconcile(
         &mut self,
         callsign: Callsign,
-        mut amount: BigDecimal,
+        mut reconcile_amount: BigDecimal,
         all_funds_to_club: bool,
     ) -> BigDecimal {
         self.audit_log.push(AuditEntry::new(AuditItem::Reconciled {
             callsign: callsign.clone(),
-            amount: amount.clone(),
+            amount: reconcile_amount.clone(),
             currency: *self.currency(),
+            all_funds_to_club,
         }));
         let ct = self.club_taking().clone();
+
         // Sold items first
-        self.items.iter_mut().for_each(|i| {
-            if *i.seller_callsign() == callsign {
+        self.items
+            .iter_mut()
+            .filter(|i| *i.seller_callsign() == callsign)
+            .for_each(|i| {
                 // Item sold by CS
                 if let Some(sold) = &mut i.sold_details {
-                    let amt_less_club: BigDecimal = sold.hammer_price() * (1 - ct.clone());
-                    amount += amt_less_club.clone();
-                    sold.seller_reconciled = amt_less_club;
+                    let hammer_less_club: BigDecimal = sold.hammer_price() * (1 - ct.clone());
+                    let amt = hammer_less_club;
+                    reconcile_amount += amt.clone();
+                    sold.seller_reconciled = true;
                     sold.seller_all_funds_to_club = all_funds_to_club;
                 }
-            }
-        });
+            });
+
+        // Liabilities at the highest point
+        if let Some(due) = self.callsign_liabilities.get_mut(&callsign) {
+            let dues_paid = due.clone().min(reconcile_amount.clone());
+            *due -= dues_paid.clone();
+            reconcile_amount -= dues_paid;
+        }
 
         // Then bought items
-        self.items.iter_mut().for_each(|i| {
-            if i.sold_details()
-                .as_ref()
-                .is_some_and(|s| *s.buyer_callsign() == callsign)
-            {
+        self.items
+            .iter_mut()
+            .filter(|i| {
+                i.sold_details()
+                    .as_ref()
+                    .is_some_and(|s| *s.buyer_callsign() == callsign)
+            })
+            .for_each(|i| {
                 // Item bought by CS
                 if let Some(sold) = &mut i.sold_details {
-                    let amt = sold.hammer_price().clone().min(amount.clone());
-                    amount -= amt.clone();
-                    sold.buyer_reconciled = amt;
+                    let amt = sold.hammer_price().clone();
+                    reconcile_amount -= amt.clone();
+                    sold.buyer_reconciled = true;
                 }
-            }
-        });
+            });
 
-        amount
+        if reconcile_amount < BigDecimal::zero() {
+            // Store amount still owe
+            self.callsign_liabilities.entry(callsign)
+                .and_modify(|lia| *lia -= reconcile_amount.clone())
+                .or_insert(-reconcile_amount.clone());
+        }
+
+        reconcile_amount.max(BigDecimal::zero())
     }
 }
 
@@ -215,8 +242,8 @@ impl Item {
         self.sold_details = Some(SoldDetails {
             hammer_price,
             buyer_callsign,
-            buyer_reconciled: BigDecimal::zero(),
-            seller_reconciled: BigDecimal::zero(),
+            buyer_reconciled: false,
+            seller_reconciled: false,
             seller_all_funds_to_club: false,
         });
         self
@@ -230,10 +257,10 @@ pub struct SoldDetails {
     hammer_price: BigDecimal,
     /// The callsign of the buyer
     buyer_callsign: Callsign,
-    /// How much has the buyer reconciled against this item?
-    buyer_reconciled: BigDecimal,
-    /// How much has the seller reconciled against this item?
-    seller_reconciled: BigDecimal,
+    /// Has the buyer reconciled against this item?
+    buyer_reconciled: bool,
+    /// Has the seller reconciled against this item?
+    seller_reconciled: bool,
     /// Indicates that the seller opted for all revenue to go to the
     /// club
     seller_all_funds_to_club: bool,
@@ -299,10 +326,11 @@ pub enum AuditItem {
         lot_number: String,
         description: String,
     },
-    #[display("{callsign} has reconciled {amount} {currency}")]
+    #[display("{callsign} has reconciled {amount} {currency} (all funds going to the club: {all_funds_to_club:?})")]
     Reconciled {
         callsign: Callsign,
         amount: BigDecimal,
         currency: Currency,
+        all_funds_to_club: bool,
     },
 }
