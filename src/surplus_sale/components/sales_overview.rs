@@ -52,12 +52,12 @@ pub fn SalesOverview() -> Element {
                             if *sold.seller_reconciled() {
                                 td { "✅" }
                             } else {
-                                td { "{sold.seller_reconciled():0.02}" }
+                                td { "❌" }
                             }
                             if *sold.buyer_reconciled() {
                                 td { "✅" }
                             } else {
-                                td { "{sold.buyer_reconciled():0.02}" }
+                                td { "❌" }
                             }
                         } else {
                             td { colspan: 4, "Item not sold." }
