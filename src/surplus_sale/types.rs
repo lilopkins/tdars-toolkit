@@ -1,7 +1,7 @@
 #![allow(clippy::ref_option)]
 
-use std::{fmt, str::FromStr};
 use std::collections::HashMap;
+use std::{fmt, str::FromStr};
 
 use bigdecimal::{BigDecimal, Zero};
 use chrono::{DateTime, Local};
@@ -72,6 +72,18 @@ impl Datafile {
             next += 1;
         }
         next
+    }
+
+    /// Delete an item if it is not at all reconciled.
+    pub fn delete_item(&mut self, lot_number: String) {
+        self.items.retain(|i| {
+            (*i.lot_number() != lot_number)
+                || i.sold_details()
+                    .as_ref()
+                    .is_some_and(|s| *s.buyer_reconciled() || *s.seller_reconciled())
+        });
+        self.audit_log
+            .push(AuditEntry::new(AuditItem::RevokeItem { lot_number }));
     }
 
     /// Set the currency of the auction
@@ -210,13 +222,15 @@ impl Datafile {
 
         if reconcile_amount < BigDecimal::zero() {
             // Store amount still owe
-            self.callsign_liabilities.entry(callsign)
+            self.callsign_liabilities
+                .entry(callsign)
                 .and_modify(|lia| *lia -= reconcile_amount.clone())
                 .or_insert(-reconcile_amount.clone());
         } else {
-            self.audit_log.push(AuditEntry::new(AuditItem::ReconciledFully {
-                callsign: callsign.clone(),
-            }));
+            self.audit_log
+                .push(AuditEntry::new(AuditItem::ReconciledFully {
+                    callsign: callsign.clone(),
+                }));
             if reconcile_amount > BigDecimal::zero() {
                 self.audit_log.push(AuditEntry::new(AuditItem::ChangeGiven {
                     callsign,
@@ -351,13 +365,13 @@ pub enum AuditItem {
         all_funds_to_club: bool,
     },
     #[display("{callsign} has reconciled fully")]
-    ReconciledFully {
-        callsign: Callsign,
-    },
+    ReconciledFully { callsign: Callsign },
     #[display("{callsign} has been given change: {amount} {currency}")]
     ChangeGiven {
         callsign: Callsign,
         amount: BigDecimal,
         currency: Currency,
-    }
+    },
+    #[display("The lot {lot_number} has been revoked.")]
+    RevokeItem { lot_number: String },
 }

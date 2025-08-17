@@ -5,9 +5,12 @@ use crate::surplus_sale::types::Datafile;
 
 #[component]
 pub fn SalesOverview() -> Element {
-    let datafile: Signal<Datafile> = use_context();
+    let mut datafile: Signal<Datafile> = use_context();
     let sym = use_memo(move || datafile.read().currency().symbol());
-    // TODO Allow entries to be revoked so they can be re-entered.
+
+    let mut delete_item = move |lot_nmr| {
+        datafile.write().delete_item(lot_nmr);
+    };
 
     rsx! {
         table { class: "table",
@@ -20,6 +23,7 @@ pub fn SalesOverview() -> Element {
                     th { "Buyer" }
                     th { "S reconciled" }
                     th { "B reconciled" }
+                    th {}
                 }
             }
             tbody {
@@ -60,8 +64,24 @@ pub fn SalesOverview() -> Element {
                             } else {
                                 td { "❌" }
                             }
+                            if *sold.buyer_reconciled() || *sold.seller_reconciled() {
+                                td {}
+                            } else {
+                                td {
+                                    button {
+                                        class: "button",
+                                        "data-style": "outline",
+                                        onclick: {
+                                            let lot_nmr = item.lot_number().clone();
+                                            move |_| delete_item(lot_nmr.clone())
+                                        },
+                                        "Revoke"
+                                    }
+                                }
+                            }
                         } else {
                             td { colspan: 4, "Item not sold." }
+                            td {}
                         }
                     }
                 }

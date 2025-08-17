@@ -24,7 +24,12 @@ pub fn Reconciliation() -> Element {
 
     let sym = use_memo(move || datafile.read().currency().symbol());
     let liability = use_memo(move || {
-        datafile.read().callsign_liabilities().get(&callsign()).cloned().clone()
+        datafile
+            .read()
+            .callsign_liabilities()
+            .get(&callsign())
+            .cloned()
+            .clone()
     });
     let items_sold = use_memo(move || {
         datafile
@@ -33,9 +38,9 @@ pub fn Reconciliation() -> Element {
             .iter()
             .filter(|i| {
                 *i.seller_callsign() == callsign()
-                    && i.sold_details().as_ref().is_some_and(|s| {
-                        !s.seller_reconciled()
-                    })
+                    && i.sold_details()
+                        .as_ref()
+                        .is_some_and(|s| !s.seller_reconciled())
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -46,9 +51,9 @@ pub fn Reconciliation() -> Element {
             .items()
             .iter()
             .filter(|i| {
-                i.sold_details().as_ref().is_some_and(|s| {
-                    *s.buyer_callsign() == callsign() && !s.buyer_reconciled()
-                })
+                i.sold_details()
+                    .as_ref()
+                    .is_some_and(|s| *s.buyer_callsign() == callsign() && !s.buyer_reconciled())
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -164,7 +169,9 @@ pub fn Reconciliation() -> Element {
                     if let Some(liability) = liability() {
                         tr {
                             td {}
-                            td { em { "Unpaid owing" } }
+                            td {
+                                em { "Unpaid owing" }
+                            }
                             td { "-{sym} {liability:0.02}" }
                             td { "-{sym} {liability:0.02}" }
                         }
@@ -198,9 +205,13 @@ pub fn Reconciliation() -> Element {
                                     em { "less club taking:" }
                                 }
                                 td {
-                                    em { "-{sym} {(sold.hammer_price() * datafile().club_taking()):0.02}" }
+                                    em {
+                                        "-{sym} {(sold.hammer_price() * datafile().club_taking()):0.02}"
+                                    }
                                 }
-                                td { "{sym} {(sold.hammer_price() * (1 - datafile().club_taking())):0.02}" }
+                                td {
+                                    "{sym} {(sold.hammer_price() * (1 - datafile().club_taking())):0.02}"
+                                }
                             }
                         }
                     }
