@@ -142,7 +142,12 @@ impl Datafile {
     }
 
     /// Reconcile the callsign by the amount. Returns the amount remaining, i.e. change.
-    pub fn reconcile(&mut self, callsign: Callsign, mut amount: BigDecimal, all_funds_to_club: bool) -> BigDecimal {
+    pub fn reconcile(
+        &mut self,
+        callsign: Callsign,
+        mut amount: BigDecimal,
+        all_funds_to_club: bool,
+    ) -> BigDecimal {
         self.audit_log.push(AuditEntry::new(AuditItem::Reconciled {
             callsign: callsign.clone(),
             amount: amount.clone(),
