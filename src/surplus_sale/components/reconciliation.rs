@@ -59,12 +59,12 @@ pub fn Reconciliation() -> Element {
         let mut total = liability().unwrap_or_else(BigDecimal::zero);
         for item in &items_bought() {
             if let Some(sold) = item.sold_details() {
-                total -= sold.hammer_price();
+                total += sold.hammer_price();
             }
         }
         for item in &items_sold() {
             if let Some(sold) = item.sold_details() {
-                total += sold.hammer_price() * (1 - datafile().club_taking());
+                total -= sold.hammer_price() * (1 - datafile().club_taking());
             }
         }
         total
