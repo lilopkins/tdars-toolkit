@@ -68,9 +68,24 @@ pub fn Reconciliation() -> Element {
     });
     use_effect(move || reconcile_amount.set(total()));
 
+    let mut reconcile = move |to_club| {
+        let amt = if total() < BigDecimal::zero() {
+            -reconcile_amount()
+        } else {
+            reconcile_amount()
+        };
+        let change = datafile.write().reconcile(callsign(), amt, to_club);
+        if !change.is_zero() {
+            toast_api.info(
+                format!("Change for {callsign}"),
+                ToastOptions::new().description(format!("{change:0.02} to be given back")),
+            );
+        }
+        needs_saving.set(NeedsSaving(true));
+    };
+
     // TODO Resolve partial reconciliation
     // TODO Resolve change
-    // TODO Add all funds to club button
 
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "1rem",
@@ -110,24 +125,16 @@ pub fn Reconciliation() -> Element {
                     button {
                         class: "button",
                         "data-style": "primary",
-                        onclick: move |_| {
-                            let amt = if total() < BigDecimal::zero() {
-                                -reconcile_amount()
-                            } else {
-                                reconcile_amount()
-                            };
-                            let change = datafile.write().reconcile(callsign(), amt, false);
-                            if !change.is_zero() {
-                                toast_api
-                                    .info(
-                                        format!("Change for {callsign}"),
-                                        ToastOptions::new()
-                                            .description(format!("{change:0.02} to be given back")),
-                                    );
-                            }
-                            needs_saving.set(NeedsSaving(true));
-                        },
+                        onclick: move |_| reconcile(false),
                         "Reconcile"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(true),
+                        "Revenue to Club"
                     }
                 }
             }
