@@ -207,6 +207,17 @@ impl Datafile {
             self.callsign_liabilities.entry(callsign)
                 .and_modify(|lia| *lia -= reconcile_amount.clone())
                 .or_insert(-reconcile_amount.clone());
+        } else {
+            self.audit_log.push(AuditEntry::new(AuditItem::ReconciledFully {
+                callsign: callsign.clone(),
+            }));
+            if reconcile_amount > BigDecimal::zero() {
+                self.audit_log.push(AuditEntry::new(AuditItem::ChangeGiven {
+                    callsign,
+                    amount: reconcile_amount.clone(),
+                    currency: *self.currency(),
+                }));
+            }
         }
 
         reconcile_amount.max(BigDecimal::zero())
@@ -333,4 +344,14 @@ pub enum AuditItem {
         currency: Currency,
         all_funds_to_club: bool,
     },
+    #[display("{callsign} has reconciled fully")]
+    ReconciledFully {
+        callsign: Callsign,
+    },
+    #[display("{callsign} has been given change: {amount} {currency}")]
+    ChangeGiven {
+        callsign: Callsign,
+        amount: BigDecimal,
+        currency: Currency,
+    }
 }
