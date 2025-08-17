@@ -6,6 +6,7 @@ use crate::surplus_sale::types::Datafile;
 #[component]
 pub fn SalesOverview() -> Element {
     let datafile: Signal<Datafile> = use_context();
+    let sym = use_memo(move || datafile.read().currency().symbol());
     // TODO Allow entries to be revoked so they can be re-entered.
 
     rsx! {
@@ -30,7 +31,7 @@ pub fn SalesOverview() -> Element {
                                 em { "Unpaid amounts" }
                             }
                             td {}
-                            td { "{liability:0.02}" }
+                            td { "{sym} {liability:0.02}" }
                             td { "{callsign}" }
                             td { colspan: 2 }
                         }
@@ -47,7 +48,7 @@ pub fn SalesOverview() -> Element {
                         td { "{item.description()}" }
                         td { "{item.seller_callsign()}" }
                         if let Some(sold) = item.sold_details() {
-                            td { "{sold.hammer_price():0.02}" }
+                            td { "{sym} {sold.hammer_price():0.02}" }
                             td { "{sold.buyer_callsign()}" }
                             if *sold.seller_reconciled() {
                                 td { "✅" }

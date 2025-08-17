@@ -22,6 +22,7 @@ pub fn Reconciliation() -> Element {
     let callsign = use_signal(Callsign::default);
     let mut reconcile_amount = use_signal(BigDecimal::zero);
 
+    let sym = use_memo(move || datafile.read().currency().symbol());
     let liability = use_memo(move || {
         datafile.read().callsign_liabilities().get(&callsign()).cloned().clone()
     });
@@ -69,7 +70,7 @@ pub fn Reconciliation() -> Element {
         }
         total
     });
-    use_effect(move || reconcile_amount.set(total()));
+    use_effect(move || reconcile_amount.set(total().abs()));
 
     let mut reconcile = move |to_club| {
         let amt = if total() < BigDecimal::zero() {
@@ -113,7 +114,7 @@ pub fn Reconciliation() -> Element {
                         id: "reconcile-amount",
                         placeholder: "3.50",
                         style: "width: 6em",
-                        value: "{reconcile_amount().abs():0.02}",
+                        value: "{reconcile_amount():0.02}",
                         onchange: move |e| {
                             if let Ok(amt) = BigDecimal::from_str(&e.value()) {
                                 reconcile_amount.set(amt);
@@ -142,9 +143,9 @@ pub fn Reconciliation() -> Element {
             p { margin: 0,
                 "This individual "
                 match total().cmp(&BigDecimal::zero()) {
-                    Ordering::Less => "owes the club the displayed amount.",
+                    Ordering::Greater => "owes the club the displayed amount.",
                     Ordering::Equal => "has nothing to reconcile.",
-                    Ordering::Greater => "is owed by the club the displayed amount.",
+                    Ordering::Less => "is owed by the club the displayed amount.",
                 }
             }
 
@@ -164,8 +165,8 @@ pub fn Reconciliation() -> Element {
                         tr {
                             td {}
                             td { em { "Unpaid owing" } }
-                            td { "{liability:0.02}" }
-                            td { "{liability:0.02}" }
+                            td { "-{sym} {liability:0.02}" }
+                            td { "-{sym} {liability:0.02}" }
                         }
                     }
                     for item in &items_bought() {
@@ -173,8 +174,8 @@ pub fn Reconciliation() -> Element {
                             td { "{item.lot_number()}" }
                             td { "{item.description()}" }
                             if let Some(sold) = item.sold_details() {
-                                td { "({sold.hammer_price():0.02})" }
-                                td { "({sold.hammer_price():0.02})" }
+                                td { "-{sym} {sold.hammer_price():0.02}" }
+                                td { "-{sym} {sold.hammer_price():0.02}" }
                             } else {
                                 td { colspan: 3, "not sold" }
                             }
@@ -185,7 +186,7 @@ pub fn Reconciliation() -> Element {
                             td { "{item.lot_number()}" }
                             td { "{item.description()}" }
                             if let Some(sold) = item.sold_details() {
-                                td { "{sold.hammer_price():0.02}" }
+                                td { "{sym} {sold.hammer_price():0.02}" }
                                 td {}
                             } else {
                                 td { colspan: 3, "not sold" }
@@ -197,9 +198,9 @@ pub fn Reconciliation() -> Element {
                                     em { "less club taking:" }
                                 }
                                 td {
-                                    em { "({(sold.hammer_price() * datafile().club_taking()):0.02})" }
+                                    em { "-{sym} {(sold.hammer_price() * datafile().club_taking()):0.02}" }
                                 }
-                                td { "{(sold.hammer_price() * (1 - datafile().club_taking())):0.02}" }
+                                td { "{sym} {(sold.hammer_price() * (1 - datafile().club_taking())):0.02}" }
                             }
                         }
                     }

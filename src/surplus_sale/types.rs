@@ -170,6 +170,9 @@ impl Datafile {
             .for_each(|i| {
                 // Item sold by CS
                 if let Some(sold) = &mut i.sold_details {
+                    if sold.seller_reconciled {
+                        return;
+                    }
                     let hammer_less_club: BigDecimal = sold.hammer_price() * (1 - ct.clone());
                     let amt = hammer_less_club;
                     reconcile_amount += amt.clone();
@@ -196,6 +199,9 @@ impl Datafile {
             .for_each(|i| {
                 // Item bought by CS
                 if let Some(sold) = &mut i.sold_details {
+                    if sold.buyer_reconciled {
+                        return;
+                    }
                     let amt = sold.hammer_price().clone();
                     reconcile_amount -= amt.clone();
                     sold.buyer_reconciled = true;
