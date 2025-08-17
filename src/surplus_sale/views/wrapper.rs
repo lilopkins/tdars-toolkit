@@ -18,7 +18,8 @@ pub const ERROR_DURATION: Duration = Duration::from_secs(12);
 pub fn SurplusSale() -> Element {
     let toast_api = use_toast();
     let mut needs_saving = use_context_provider(|| Signal::new(NeedsSaving(false)));
-    let mut datafile: Signal<Option<Datafile>> = use_signal(|| None);
+    let mut datafile: Signal<Datafile> = use_signal(Datafile::new);
+    let mut datafile_open = use_signal(|| false);
     let mut configure_open = use_signal(|| false);
 
     rsx! {
@@ -78,7 +79,8 @@ pub fn SurplusSale() -> Element {
                                 return;
                             }
                             tracing::info!("Creating new...");
-                            datafile.set(Some(Datafile::new()));
+                            datafile.set(Datafile::new());
+                            datafile_open.set(true);
                             needs_saving.set(NeedsSaving(true));
                         },
                         "New"
@@ -114,7 +116,8 @@ pub fn SurplusSale() -> Element {
                                 let data = path.read().await;
                                 match rmp_serde::from_read::<_, Datafile>(Cursor::new(data)) {
                                     Ok(datafile_struct) => {
-                                        datafile.set(Some(datafile_struct));
+                                        datafile.set(datafile_struct);
+                                        datafile_open.set(true);
                                         needs_saving.set(NeedsSaving(false));
                                     }
                                     Err(e) => {
@@ -136,19 +139,19 @@ pub fn SurplusSale() -> Element {
                         index: 2usize,
                         class: "navbar-item",
                         value: "save".to_string(),
-                        disabled: datafile().is_none(),
+                        disabled: !datafile_open(),
                         to: Route::SurplusSale {},
                         onclick: |_| (),
                         onclick_only: true,
                         on_select: move |_| async move {
                             tracing::info!("Saving...");
-                            if let Some(datafile_struct) = datafile() {
+
                                 #[allow(
                                     // Button is disabled when this doesn't unwrap
                                     clippy::unwrap_used,
                                     reason = "the ability to serialise the datafile is guaranteed"
                                 )]
-                                let data = rmp_serde::to_vec(&datafile_struct).unwrap();
+                                let data = rmp_serde::to_vec(&datafile()).unwrap();
                                 let date = Local::now().date_naive();
                                 if let Some(path) = rfd::AsyncFileDialog::new()
                                     .add_filter("TDARS auction", &["tdars_auction"])
@@ -169,9 +172,7 @@ pub fn SurplusSale() -> Element {
                                         needs_saving.set(NeedsSaving(false));
                                     }
                                 }
-                            } else {
-                                unreachable!();
-                            }
+
                         },
                         "Save"
                     }
@@ -179,7 +180,7 @@ pub fn SurplusSale() -> Element {
                         index: 3usize,
                         class: "navbar-item",
                         value: "configure".to_string(),
-                        disabled: datafile().is_none(),
+                        disabled: !datafile_open(),
                         to: Route::SurplusSale {},
                         onclick: |_| (),
                         onclick_only: true,
@@ -190,7 +191,7 @@ pub fn SurplusSale() -> Element {
                         index: 4usize,
                         class: "navbar-item",
                         value: "close".to_string(),
-                        disabled: datafile().is_none(),
+                        disabled: !datafile_open(),
                         to: Route::SurplusSale {},
                         onclick: |_| (),
                         onclick_only: true,
@@ -210,7 +211,8 @@ pub fn SurplusSale() -> Element {
                                 }
                             }
                             tracing::info!("Closing...");
-                            datafile.set(None);
+                            datafile.set(Datafile::new());
+                            datafile_open.set(false);
                             needs_saving.set(NeedsSaving(false));
                         },
                         "Close"
@@ -221,7 +223,7 @@ pub fn SurplusSale() -> Element {
             NavbarNav {
                 class: "navbar-nav",
                 index: 2usize,
-                disabled: datafile().is_none(),
+                disabled: !datafile_open(),
                 NavbarTrigger { class: "navbar-trigger",
                     "Export"
                     NavbarIcon {}
@@ -243,7 +245,7 @@ pub fn SurplusSale() -> Element {
 
         h2 { font_size: "1rem", "Surplus Sale" }
 
-        if let Some(datafile) = datafile() {
+        if datafile_open() {
             LoadedFile { loaded_file: datafile, configure_open }
         } else {
             "Nothing open..."

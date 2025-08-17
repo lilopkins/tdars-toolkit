@@ -10,12 +10,12 @@ use crate::surplus_sale::{
 #[derive(PartialEq, Clone, Props)]
 pub struct LoadedFileProps {
     configure_open: Signal<bool>,
-    loaded_file: Datafile,
+    loaded_file: Signal<Datafile>,
 }
 
 #[component]
 pub fn LoadedFile(props: LoadedFileProps) -> Element {
-    let mut datafile: Signal<Datafile> = use_context_provider(|| Signal::new(props.loaded_file));
+    let mut datafile: Signal<Datafile> = use_context_provider(|| props.loaded_file);
     let mut needs_saving: Signal<NeedsSaving> = use_context();
     let configure_open = props.configure_open;
 
