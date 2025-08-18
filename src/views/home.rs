@@ -4,12 +4,16 @@ use crate::Route;
 
 #[component]
 pub fn Home() -> Element {
+    let version = use_memo(|| env!("CARGO_PKG_VERSION"));
+
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "0.5rem",
 
             div { text_align: "center",
                 h1 { margin_bottom: 0, "TDARS Toolkit" }
-                p { margin_top: 0, "by Lily Hopkins 2E0HPS for the Telford & District ARS" }
+                p { margin_top: 0,
+                    "by Lily Hopkins 2E0HPS for the Telford & District ARS (v{version})"
+                }
             }
 
             Link { to: Route::SurplusSale {},
