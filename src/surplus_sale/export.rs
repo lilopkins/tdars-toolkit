@@ -21,7 +21,10 @@ pub fn export(datafile: &Datafile) -> Result<Vec<u8>, XlsxError> {
     workbook.save_to_buffer()
 }
 
-#[allow(clippy::too_many_lines, reason = "this function encapsulates one behaviour")]
+#[allow(
+    clippy::too_many_lines,
+    reason = "this function encapsulates one behaviour"
+)]
 fn create_transactions_sheet(
     workbook: &mut Workbook,
     datafile: &Datafile,
