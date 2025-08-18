@@ -108,7 +108,10 @@ jobs:
         shell: bash
         run: |
           dx bundle --release --features bundle --json-output --verbose | tee .dx-bundle-output
-          echo "BUNDLES=$(cat .dx-bundle-output | tail -1 | jq -r '.json | fromjson | .BundleOutput.bundles []')" >> $GITHUB_OUTPUT
+          BUNDLES=$(cat .dx-bundle-output | tail -1 | sed 's/\x1b\[?25h//g' | jq -r '.json | fromjson | .BundleOutput.bundles []')
+          echo "BUNDLES<<EOF" >> $GITHUB_OUTPUT
+          echo "$BUNDLES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Release binary to GitHub
         uses: softprops/action-gh-release@v1
         with:
