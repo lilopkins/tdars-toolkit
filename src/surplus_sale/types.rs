@@ -47,26 +47,20 @@ impl Datafile {
             items: vec![],
             callsign_liabilities: HashMap::new(),
             audit_log: vec![AuditEntry::new(AuditItem::Created {
-                currency: currency,
+                currency,
                 club_taking_pct: club_taking * 100,
             })],
         }
     }
 
     /// Return the next lot number for the provided callsign
-    pub fn next_lot_number_for(&self, callsign: Callsign) -> i32 {
+    pub fn next_lot_number_for(&self, callsign: &Callsign) -> i32 {
         let mut next = 1;
         let cs = callsign.callsign();
         loop {
-            if self
-                .items
-                .iter()
-                .find(|i| {
-                    i.seller_callsign().callsign() == cs
-                        && *i.lot_number() == format!("{cs}-{next}")
-                })
-                .is_none()
-            {
+            if !self.items.iter().any(|i| {
+                i.seller_callsign().callsign() == cs && *i.lot_number() == format!("{cs}-{next}")
+            }) {
                 break;
             }
             next += 1;
@@ -129,7 +123,7 @@ impl Datafile {
         let cs = sale
             .sold_details
             .as_ref()
-            .map(|s| s.buyer_callsign())
+            .map(SoldDetails::buyer_callsign)
             .cloned();
         if let Some(cs) = cs {
             if !self.callsigns.contains(&cs) {

@@ -1,28 +1,45 @@
-use super::types::*;
+use super::types::Datafile;
 
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
-use rust_xlsxwriter::*;
+use rust_xlsxwriter::{Format, FormatBorder, Formula, Workbook, XlsxError};
 
-pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
+#[allow(
+    clippy::unreadable_literal,
+    reason = "hex colours are better not separated"
+)]
+const ALT_BG: u32 = 0xb4c7dc;
+
+pub fn export(datafile: &Datafile) -> Result<Vec<u8>, XlsxError> {
     let mut workbook = Workbook::new();
 
+    // Transactions
+    create_transactions_sheet(&mut workbook, datafile)?;
+
+    // Audit Log
+    create_audit_sheet(&mut workbook, datafile)?;
+
+    workbook.save_to_buffer()
+}
+
+#[allow(clippy::too_many_lines, reason = "this function encapsulates one behaviour")]
+fn create_transactions_sheet(
+    workbook: &mut Workbook,
+    datafile: &Datafile,
+) -> Result<(), XlsxError> {
     let title_format = Format::new().set_bold().set_font_size(28.);
     let table_heading_format = Format::new()
         .set_bold()
         .set_border_bottom(FormatBorder::Medium);
-    let alt_bg = 0xb4c7dc;
     let regular_format = Format::new();
+    let alt_format = Format::new().set_background_color(ALT_BG);
     let open_closing_balance_format = Format::new().set_italic();
     let open_closing_balance_alt_format: Format = open_closing_balance_format
         .clone()
-        .set_background_color(alt_bg);
-    let alt_format = Format::new().set_background_color(alt_bg);
-    let audit_date_format = Format::new().set_num_format("YYYY-MM-DD HH:MM:SS.000");
-    let audit_date_alt_format = audit_date_format.clone().set_background_color(alt_bg);
-    let accounting_format = Format::new().set_num_format("[$£-809]#,##0.00;[RED]-[$£-809]#,##0.00");
-    let accounting_alt_format = accounting_format.clone().set_background_color(alt_bg);
+        .set_background_color(ALT_BG);
 
-    // Transactions
+    let accounting_format = Format::new().set_num_format("[$£-809]#,##0.00;[RED]-[$£-809]#,##0.00");
+    let accounting_alt_format = accounting_format.clone().set_background_color(ALT_BG);
+
     let worksheet = workbook
         .add_worksheet()
         .set_name("Transactions")?
@@ -65,22 +82,22 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
                     &accounting_format
                 };
 
-                worksheet.write_with_format(row, 1, item.lot_number(), &fmt_reg)?;
-                worksheet.write_with_format(row, 2, item.description(), &fmt_reg)?;
-                worksheet.write_with_format(row, 3, sold.buyer_callsign().to_string(), &fmt_reg)?;
-                worksheet.write_with_format(row, 4, "", &fmt_reg)?;
+                worksheet.write_with_format(row, 1, item.lot_number(), fmt_reg)?;
+                worksheet.write_with_format(row, 2, item.description(), fmt_reg)?;
+                worksheet.write_with_format(row, 3, sold.buyer_callsign().to_string(), fmt_reg)?;
+                worksheet.write_with_format(row, 4, "", fmt_reg)?;
                 worksheet.write_with_format(
                     row,
                     5,
                     #[allow(clippy::unwrap_used, reason = "excel needs to deal with it!")]
                     sold.hammer_price().to_f64().unwrap(),
-                    &fmt_acc,
+                    fmt_acc,
                 )?;
                 worksheet.write_with_format(
                     row,
                     6,
                     Formula::new(format!("=G{}-E{}+F{}", row, row + 1, row + 1)),
-                    &fmt_acc,
+                    fmt_acc,
                 )?;
 
                 row += 1;
@@ -121,14 +138,14 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
                     4,
                     #[allow(clippy::unwrap_used, reason = "excel needs to deal with it!")]
                     hammer_less_club.to_f64().unwrap(),
-                    &fmt_acc,
+                    fmt_acc,
                 )?;
-                worksheet.write_with_format(row, 5, "", &fmt_reg)?;
+                worksheet.write_with_format(row, 5, "", fmt_reg)?;
                 worksheet.write_with_format(
                     row,
                     6,
                     Formula::new(format!("=G{}-E{}+F{}", row, row + 1, row + 1)),
-                    &fmt_acc,
+                    fmt_acc,
                 )?;
 
                 row += 1;
@@ -152,14 +169,26 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
     } else {
         &open_closing_balance_format
     };
-    worksheet.write_with_format(row, 1, "", &fmt_reg)?;
-    worksheet.write_with_format(row, 2, "Closing balance", &fmt_open_close)?;
-    worksheet.write_with_format(row, 3, "", &fmt_reg)?;
-    worksheet.write_with_format(row, 4, "", &fmt_reg)?;
-    worksheet.write_with_format(row, 5, "", &fmt_reg)?;
-    worksheet.write_with_format(row, 6, Formula::new(format!("=G{}", row - 1)), &fmt_acc)?;
+    worksheet.write_with_format(row, 1, "", fmt_reg)?;
+    worksheet.write_with_format(row, 2, "Closing balance", fmt_open_close)?;
+    worksheet.write_with_format(row, 3, "", fmt_reg)?;
+    worksheet.write_with_format(row, 4, "", fmt_reg)?;
+    worksheet.write_with_format(row, 5, "", fmt_reg)?;
+    worksheet.write_with_format(row, 6, Formula::new(format!("=G{}", row - 1)), fmt_acc)?;
 
-    // Audit Log
+    Ok(())
+}
+
+fn create_audit_sheet(workbook: &mut Workbook, datafile: &Datafile) -> Result<(), XlsxError> {
+    let title_format = Format::new().set_bold().set_font_size(28.);
+    let table_heading_format = Format::new()
+        .set_bold()
+        .set_border_bottom(FormatBorder::Medium);
+    let regular_format = Format::new();
+    let alt_format = Format::new().set_background_color(ALT_BG);
+    let audit_date_format = Format::new().set_num_format("YYYY-MM-DD HH:MM:SS.000");
+    let audit_date_alt_format = audit_date_format.clone().set_background_color(ALT_BG);
+
     let worksheet = workbook
         .add_worksheet()
         .set_name("Audit Log")?
@@ -193,9 +222,9 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
             reason = "we want to panic if there are too many rows!"
         )]
         let row = (4 + idx).try_into().unwrap();
-        worksheet.write_datetime_with_format(row, 1, entry.moment().naive_local(), &fmt_date)?;
+        worksheet.write_datetime_with_format(row, 1, entry.moment().naive_local(), fmt_date)?;
         worksheet.write_with_format(row, 2, format!("{}", entry.item()), fmt_reg)?;
     }
 
-    workbook.save_to_buffer()
+    Ok(())
 }

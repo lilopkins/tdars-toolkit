@@ -245,7 +245,7 @@ pub fn SurplusSale() -> Element {
                                 .save_file()
                                 .await
                             {
-                                match export(datafile()) {
+                                match export(&datafile.read()) {
                                     Err(e) => {
                                         toast_api
                                             .error(

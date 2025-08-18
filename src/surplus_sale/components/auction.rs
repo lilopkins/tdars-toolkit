@@ -26,7 +26,7 @@ pub fn Auction() -> Element {
             format!(
                 "{}-{}",
                 seller().callsign(),
-                datafile.read().next_lot_number_for(seller())
+                datafile.read().next_lot_number_for(&seller.read())
             )
         }
     });
