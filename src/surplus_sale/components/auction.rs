@@ -38,8 +38,8 @@ pub fn Auction() -> Element {
     let sell_item = move |sold| async move {
         if lot_number().is_empty()
             || item_description().is_empty()
-            || seller.is_empty()
-            || (sold && buyer().is_empty())
+            || seller().callsign().is_empty()
+            || (sold && buyer().callsign().is_empty())
         {
             return;
         }
