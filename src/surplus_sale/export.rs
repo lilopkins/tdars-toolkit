@@ -7,11 +7,15 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
     let mut workbook = Workbook::new();
 
     let title_format = Format::new().set_bold().set_font_size(28.);
-    let table_heading_format = Format::new().set_bold().set_border_bottom(FormatBorder::Medium);
+    let table_heading_format = Format::new()
+        .set_bold()
+        .set_border_bottom(FormatBorder::Medium);
     let alt_bg = 0xb4c7dc;
     let regular_format = Format::new();
     let open_closing_balance_format = Format::new().set_italic();
-    let open_closing_balance_alt_format: Format = open_closing_balance_format.clone().set_background_color(alt_bg);
+    let open_closing_balance_alt_format: Format = open_closing_balance_format
+        .clone()
+        .set_background_color(alt_bg);
     let alt_format = Format::new().set_background_color(alt_bg);
     let audit_date_format = Format::new().set_num_format("YYYY-MM-DD HH:MM:SS.000");
     let audit_date_alt_format = audit_date_format.clone().set_background_color(alt_bg);
@@ -50,8 +54,16 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
         if let Some(sold) = &item.sold_details() {
             if *sold.buyer_reconciled() {
                 let use_alt_format = row % 2 == 1;
-                let fmt_reg = if use_alt_format { &alt_format } else { &regular_format };
-                let fmt_acc = if use_alt_format { &accounting_alt_format } else { &accounting_format };
+                let fmt_reg = if use_alt_format {
+                    &alt_format
+                } else {
+                    &regular_format
+                };
+                let fmt_acc = if use_alt_format {
+                    &accounting_alt_format
+                } else {
+                    &accounting_format
+                };
 
                 worksheet.write_with_format(row, 1, item.lot_number(), &fmt_reg)?;
                 worksheet.write_with_format(row, 2, item.description(), &fmt_reg)?;
@@ -76,12 +88,25 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
 
             if *sold.seller_reconciled() {
                 let use_alt_format = row % 2 == 1;
-                let fmt_reg = if use_alt_format { &alt_format } else { &regular_format };
-                let fmt_acc = if use_alt_format { &accounting_alt_format } else { &accounting_format };
+                let fmt_reg = if use_alt_format {
+                    &alt_format
+                } else {
+                    &regular_format
+                };
+                let fmt_acc = if use_alt_format {
+                    &accounting_alt_format
+                } else {
+                    &accounting_format
+                };
 
                 worksheet.write_with_format(row, 1, item.lot_number(), fmt_reg)?;
                 if *sold.seller_all_funds_to_club() {
-                    worksheet.write_with_format(row, 2, format!("{} (seller donated funds to club)", item.description()), fmt_reg)?;
+                    worksheet.write_with_format(
+                        row,
+                        2,
+                        format!("{} (seller donated funds to club)", item.description()),
+                        fmt_reg,
+                    )?;
                 } else {
                     worksheet.write_with_format(row, 2, item.description(), fmt_reg)?;
                 }
@@ -112,9 +137,21 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
     }
 
     let use_alt_format = row % 2 == 1;
-    let fmt_reg = if use_alt_format { &alt_format } else { &regular_format };
-    let fmt_acc = if use_alt_format { &accounting_alt_format } else { &accounting_format };
-    let fmt_open_close = if use_alt_format { &open_closing_balance_alt_format } else { &open_closing_balance_format };
+    let fmt_reg = if use_alt_format {
+        &alt_format
+    } else {
+        &regular_format
+    };
+    let fmt_acc = if use_alt_format {
+        &accounting_alt_format
+    } else {
+        &accounting_format
+    };
+    let fmt_open_close = if use_alt_format {
+        &open_closing_balance_alt_format
+    } else {
+        &open_closing_balance_format
+    };
     worksheet.write_with_format(row, 1, "", &fmt_reg)?;
     worksheet.write_with_format(row, 2, "Closing balance", &fmt_open_close)?;
     worksheet.write_with_format(row, 3, "", &fmt_reg)?;
@@ -140,8 +177,16 @@ pub fn export(datafile: Datafile) -> Result<Vec<u8>, XlsxError> {
 
     for (idx, entry) in datafile.audit_log().iter().enumerate() {
         let use_alt_format = idx % 2 == 1;
-        let fmt_reg = if use_alt_format { &alt_format } else { &regular_format };
-        let fmt_date = if use_alt_format { &audit_date_alt_format } else { &audit_date_format };
+        let fmt_reg = if use_alt_format {
+            &alt_format
+        } else {
+            &regular_format
+        };
+        let fmt_date = if use_alt_format {
+            &audit_date_alt_format
+        } else {
+            &audit_date_format
+        };
 
         #[allow(
             clippy::unwrap_used,
