@@ -36,6 +36,14 @@ pub fn Auction() -> Element {
     let mut hammer_price = use_signal(BigDecimal::zero);
 
     let sell_item = move |sold| async move {
+        if lot_number().is_empty()
+            || item_description().is_empty()
+            || seller.is_empty()
+            || (sold && buyer().is_empty())
+        {
+            return;
+        }
+
         // Set file needs saving
         needs_saving.set(NeedsSaving(true));
 
