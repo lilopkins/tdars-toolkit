@@ -5,9 +5,9 @@ name = "TDARS Toolkit"
 identifier = "uk.hpkns"
 publisher = "Hpkns"
 icon = [
-    "icon.png",
-    "icon.ico",
-    "icon.icns",
+    "icons/icon.png",
+    "icons/icon.ico",
+    "icons/icon.icns",
 ]
 category = "Utility"
 short_description = "Tools for TDARS"
