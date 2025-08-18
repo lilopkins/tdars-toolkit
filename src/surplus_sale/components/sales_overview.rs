@@ -70,7 +70,10 @@ pub fn SalesOverview() -> Element {
                             td { colspan: 3, "Item not sold." }
                         }
 
-                        if item.sold_details().as_ref().is_some_and(|sold| *sold.buyer_reconciled() || *sold.seller_reconciled()) {
+                        if item.sold_details()
+                            .as_ref()
+                            .is_some_and(|sold| *sold.buyer_reconciled() || *sold.seller_reconciled())
+                        {
                             td {}
                         } else {
                             td {

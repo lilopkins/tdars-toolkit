@@ -26,7 +26,7 @@ pub fn Auction() -> Element {
             format!(
                 "{}-{}",
                 seller().callsign(),
-                datafile.read().next_lot_number_for(seller())
+                datafile.read().next_lot_number_for(&seller.read())
             )
         }
     });
@@ -36,6 +36,14 @@ pub fn Auction() -> Element {
     let mut hammer_price = use_signal(BigDecimal::zero);
 
     let sell_item = move |sold| async move {
+        if lot_number().is_empty()
+            || item_description().is_empty()
+            || seller().callsign().is_empty()
+            || (sold && buyer().callsign().is_empty())
+        {
+            return;
+        }
+
         // Set file needs saving
         needs_saving.set(NeedsSaving(true));
 
