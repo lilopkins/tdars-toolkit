@@ -1,0 +1,104 @@
+name: Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+      - next
+
+env:
+  EXECUTABLE_NAME: tdars-toolkit
+  DIOXUS_VERSION: 0.7.0-rc.0
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions: write-all
+
+    outputs:
+      CARGO_PKG_VERSION: ${{ steps.version.outputs.CARGO_PKG_VERSION }}
+      CARGO_PKG_PRERELEASE: ${{ steps.version.outputs.CARGO_PKG_PRERELEASE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Determine Cargo version
+        id: version
+        run: |
+          export CARGO_PKG_VERSION=$(awk -F '["=]' '/^\[(workspace.)?package\]/{p=1} p && /^version[[:space:]]*=/ {gsub(/"/, "", $3); print $3; p=0}' Cargo.toml)
+          export CARGO_PKG_PRERELEASE=$([[ $CARGO_PKG_VERSION =~ -[0-9A-Za-z]+ ]] && echo "true" || echo "false")
+          echo "CARGO_PKG_VERSION=${CARGO_PKG_VERSION}" >> $GITHUB_OUTPUT
+          echo "CARGO_PKG_PRERELEASE=${CARGO_PKG_PRERELEASE}" >> $GITHUB_OUTPUT
+      - name: Create Tag and Release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.CARGO_PKG_VERSION }}
+          release_name: v${{ steps.version.outputs.CARGO_PKG_VERSION }}
+          prerelease: ${{ steps.version.outputs.CARGO_PKG_PRERELEASE }}
+
+  build:
+    name: ${{ matrix.platform.os_name }} with rust ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.platform.os }}
+    permissions: write-all
+    needs:
+      - create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os_name: Linux-aarch64
+            os: ubuntu-latest
+            dx-name: linux
+            target: aarch64-unknown-linux-musl
+            bin: tmp-events-to-discord-linux-arm64
+          - os_name: Linux-x86_64
+            os: ubuntu-latest
+            dx-name: linux
+            target: x86_64-unknown-linux-gnu
+            bin: tmp-events-to-discord-linux-amd64
+          - os_name: Windows-x86_64
+            os: windows-latest
+            dx-name: windows
+            target: x86_64-pc-windows-msvc
+            bin: tmp-events-to-discord-amd64.exe
+          - os_name: macOS-x86_64
+            os: macOS-latest
+            dx-name: macos
+            target: x86_64-apple-darwin
+            bin: tmp-events-to-discord-darwin-amd64
+          - os_name: macOS-aarch64
+            os: macOS-latest
+            dx-name: macos
+            target: aarch64-apple-darwin
+            bin: tmp-events-to-discord-darwin-arm64
+        toolchain:
+          - stable
+    steps:
+      - name: Bring forward environment
+        id: env
+        shell: bash
+        run: |
+          echo "EXECUTABLE_NAME=${EXECUTABLE_NAME}" >> $GITHUB_OUTPUT
+          echo "DIOXUS_VERSION=${DIOXUS_VERSION}" >> $GITHUB_OUTPUT
+      - name: Install dioxus
+        shell: bash
+        run: |
+          cargo install cargo-binstall
+          cargo binstall -y dioxus-cli@=${{ steps.env.outputs.DIOXUS_VERSION }}
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build bundle
+        id: build-bundles
+        shell: bash
+        run: |
+          dx bundle --release --features bundle --json-output 2>&1 | tee .dx-bundle-output
+          echo "BUNDLES=$(cat .dx-bundle-output | tail -1 | jq -r '.json | fromjson | .BundleOutput.bundles []')" >> $GITHUB_OUTPUT
+      - name: Release binary to GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.create-release.outputs.CARGO_PKG_VERSION }}
+          prerelease: ${{ needs.create-release.outputs.CARGO_PKG_PRERELEASE }}
+          files: ${{ steps.build-bundles.outputs.BUNDLES }}
