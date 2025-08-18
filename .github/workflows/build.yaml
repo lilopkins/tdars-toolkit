@@ -107,7 +107,7 @@ jobs:
         id: build-bundles
         shell: bash
         run: |
-          dx bundle --release --features bundle --json-output 2>&1 | tee .dx-bundle-output
+          dx bundle --release --features bundle --json-output --verbose | tee .dx-bundle-output
           echo "BUNDLES=$(cat .dx-bundle-output | tail -1 | jq -r '.json | fromjson | .BundleOutput.bundles []')" >> $GITHUB_OUTPUT
       - name: Release binary to GitHub
         uses: softprops/action-gh-release@v1
