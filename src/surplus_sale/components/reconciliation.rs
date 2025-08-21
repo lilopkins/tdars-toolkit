@@ -1,4 +1,6 @@
-use std::{cmp::Ordering, str::FromStr, time::Duration};
+#[cfg(feature = "escpos")]
+use std::time::Duration;
+use std::{cmp::Ordering, str::FromStr};
 
 use bigdecimal::{BigDecimal, Zero};
 use dioxus::prelude::*;
@@ -168,25 +170,28 @@ pub fn Reconciliation() -> Element {
                     class: "button",
                     "data-style": "primary",
                     onclick: move |_| {
-                        match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
-                            Ok(_) => {
-                                toast_api
-                                    .info(
-                                        "Receipt printing".to_string(),
-                                        ToastOptions::new()
-                                            .permanent(false)
-                                            .duration(Duration::from_secs(3)),
-                                    )
-                            }
-                            Err(e) => {
-                                toast_api
-                                    .error(
-                                        "Failed to print".to_string(),
-                                        ToastOptions::new()
-                                            .permanent(false)
-                                            .duration(Duration::from_secs(5))
-                                            .description(format!("{e}")),
-                                    )
+                        #[cfg(feature = "escpos")]
+                        {
+                            match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
+                                Ok(_) => {
+                                    toast_api
+                                        .info(
+                                            "Receipt printing".to_string(),
+                                            ToastOptions::new()
+                                                .permanent(false)
+                                                .duration(Duration::from_secs(3)),
+                                        )
+                                }
+                                Err(e) => {
+                                    toast_api
+                                        .error(
+                                            "Failed to print".to_string(),
+                                            ToastOptions::new()
+                                                .permanent(false)
+                                                .duration(Duration::from_secs(5))
+                                                .description(format!("{e}")),
+                                        )
+                                }
                             }
                         }
                     },

@@ -109,8 +109,13 @@ pub fn Configure(props: ConfigureProps) -> Element {
                 if cfg!(feature = "escpos") {
                     ESCPOSConfigurator {
                         on_ids_changed: move |(vid, did)| {
-                            escpos_vendor.set(vid);
-                            escpos_device.set(did);
+                            #[cfg(feature = "escpos")]
+                            {
+                                escpos_vendor.set(vid);
+                                escpos_device.set(did);
+                            }
+                            let _ = vid;
+                            let _ = did;
                         },
                     }
                 }
@@ -135,6 +140,13 @@ pub fn Configure(props: ConfigureProps) -> Element {
             }
         }
     }
+}
+
+#[cfg(not(feature = "escpos"))]
+#[component]
+fn ESCPOSConfigurator(on_ids_changed: EventHandler<(u16, u16)>) -> Element {
+    let _ = on_ids_changed;
+    rsx! {}
 }
 
 #[cfg(feature = "escpos")]
