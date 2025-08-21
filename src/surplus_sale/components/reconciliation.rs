@@ -173,14 +173,14 @@ pub fn Reconciliation() -> Element {
                         #[cfg(feature = "escpos")]
                         {
                             match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
-                                Ok(_) => {
+                                Ok(()) => {
                                     toast_api
                                         .info(
                                             "Receipt printing".to_string(),
                                             ToastOptions::new()
                                                 .permanent(false)
                                                 .duration(Duration::from_secs(3)),
-                                        )
+                                        );
                                 }
                                 Err(e) => {
                                     toast_api
@@ -190,7 +190,7 @@ pub fn Reconciliation() -> Element {
                                                 .permanent(false)
                                                 .duration(Duration::from_secs(5))
                                                 .description(format!("{e}")),
-                                        )
+                                        );
                                 }
                             }
                         }
@@ -294,7 +294,7 @@ fn print_receipt(
         .writeln("Surplus Sale")?
         .bold(false)?
         .size(2, 1)?
-        .writeln(&callsign.callsign())?
+        .writeln(callsign.callsign())?
         .reset_size()?
         .justify(JustifyMode::LEFT)?
         .feed()?
@@ -315,7 +315,7 @@ fn print_receipt(
         if let Some(sold) = item.sold_details() {
             grand_total += sold.hammer_price();
             prn.justify(JustifyMode::LEFT)?
-                .writeln(&item.description())?
+                .writeln(item.description())?
                 .justify(JustifyMode::RIGHT)?
                 .writeln(&format!("{:0.02}", sold.hammer_price()))?
                 .feed()?;
@@ -326,7 +326,7 @@ fn print_receipt(
         if let Some(sold) = item.sold_details() {
             grand_total -= sold.hammer_price() * (1 - club_taking);
             prn.justify(JustifyMode::LEFT)?
-                .writeln(&item.description())?
+                .writeln(item.description())?
                 .justify(JustifyMode::RIGHT)?
                 .writeln(&format!("-{:0.02}", sold.hammer_price()))?
                 .justify(JustifyMode::LEFT)?
