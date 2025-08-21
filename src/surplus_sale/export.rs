@@ -48,7 +48,7 @@ fn create_transactions_sheet(
         .set_name("Transactions")?
         .set_screen_gridlines(false)
         .set_print_gridlines(false)
-        .set_freeze_panes(0, 5)?
+        .set_freeze_panes(4, 0)?
         .set_column_width(0, 3)?
         .set_column_width(1, 13)?
         .set_column_width(2, 35)?
