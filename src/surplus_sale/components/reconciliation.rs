@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, str::FromStr};
+use std::{cmp::Ordering, str::FromStr, time::Duration};
 
 use bigdecimal::{BigDecimal, Zero};
 use dioxus::prelude::*;
@@ -8,6 +8,8 @@ use dioxus_primitives::{
     toast::{use_toast, ToastOptions},
 };
 
+#[cfg(feature = "escpos")]
+use crate::surplus_sale::types::Item;
 use crate::{
     components::CallsignEntry,
     surplus_sale::{types::Datafile, NeedsSaving},
@@ -21,6 +23,9 @@ pub fn Reconciliation() -> Element {
     let mut needs_saving: Signal<NeedsSaving> = use_context();
     let callsign = use_signal(Callsign::default);
     let mut reconcile_amount = use_signal(BigDecimal::zero);
+
+    #[cfg(feature = "escpos")]
+    let escpos_device: Signal<super::super::ESCPOSDevice> = use_context();
 
     let sym = use_memo(move || datafile.read().currency().symbol());
     let liability = use_memo(move || {
@@ -158,6 +163,37 @@ pub fn Reconciliation() -> Element {
 
             Separator { class: "separator", horizontal: true, decorative: true }
 
+            if cfg!(feature = "escpos") {
+                button {
+                    class: "button",
+                    "data-style": "primary",
+                    onclick: move |_| {
+                        match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
+                            Ok(_) => {
+                                toast_api
+                                    .info(
+                                        "Receipt printing".to_string(),
+                                        ToastOptions::new()
+                                            .permanent(false)
+                                            .duration(Duration::from_secs(3)),
+                                    )
+                            }
+                            Err(e) => {
+                                toast_api
+                                    .error(
+                                        "Failed to print".to_string(),
+                                        ToastOptions::new()
+                                            .permanent(false)
+                                            .duration(Duration::from_secs(5))
+                                            .description(format!("{e}")),
+                                    )
+                            }
+                        }
+                    },
+                    "Print Receipt"
+                }
+            }
+
             table { class: "table",
                 thead {
                     tr {
@@ -223,4 +259,88 @@ pub fn Reconciliation() -> Element {
             }
         }
     }
+}
+
+#[cfg(feature = "escpos")]
+fn print_receipt(
+    device: super::super::ESCPOSDevice,
+    callsign: &Callsign,
+    liability: Option<&BigDecimal>,
+    sold: &Vec<Item>,
+    bought: &Vec<Item>,
+    club_taking: &BigDecimal,
+) -> escpos::errors::Result<()> {
+    use escpos::{
+        driver::UsbDriver,
+        printer::Printer,
+        printer_options::PrinterOptions,
+        utils::{JustifyMode, Protocol},
+    };
+
+    let driver = UsbDriver::open(device.0, device.1, None, None)?;
+    let mut prn = Printer::new(driver, Protocol::default(), Some(PrinterOptions::default()));
+    let prn = prn
+        .init()?
+        .reset()?
+        .smoothing(true)?
+        .bold(true)?
+        .size(2, 2)?
+        .justify(JustifyMode::CENTER)?
+        .writeln("Surplus Sale")?
+        .bold(false)?
+        .size(2, 1)?
+        .writeln(&callsign.callsign())?
+        .reset_size()?
+        .justify(JustifyMode::LEFT)?
+        .feed()?
+        .feed()?;
+
+    let mut grand_total = BigDecimal::zero();
+
+    if let Some(liability) = liability {
+        grand_total += liability;
+        prn.justify(JustifyMode::LEFT)?
+            .writeln("Unpaid amounts")?
+            .justify(JustifyMode::RIGHT)?
+            .writeln(&format!("{liability:0.02}"))?
+            .feed()?;
+    }
+
+    for item in bought {
+        if let Some(sold) = item.sold_details() {
+            grand_total += sold.hammer_price();
+            prn.justify(JustifyMode::LEFT)?
+                .writeln(&item.description())?
+                .justify(JustifyMode::RIGHT)?
+                .writeln(&format!("{:0.02}", sold.hammer_price()))?
+                .feed()?;
+        }
+    }
+
+    for item in sold {
+        if let Some(sold) = item.sold_details() {
+            grand_total -= sold.hammer_price() * (1 - club_taking);
+            prn.justify(JustifyMode::LEFT)?
+                .writeln(&item.description())?
+                .justify(JustifyMode::RIGHT)?
+                .writeln(&format!("-{:0.02}", sold.hammer_price()))?
+                .justify(JustifyMode::LEFT)?
+                .writeln("  (less club taking)")?
+                .justify(JustifyMode::RIGHT)?
+                .writeln(&format!("{:0.02}", sold.hammer_price() * club_taking))?
+                .feed()?;
+        }
+    }
+
+    prn.size(1, 2)?
+        .justify(JustifyMode::LEFT)?
+        .writeln("Grand Total")?
+        .justify(JustifyMode::RIGHT)?
+        .writeln(&format!("{grand_total:0.02}"))?
+        .feed()?
+        .feed()?;
+
+    prn.partial_cut()?.print()?;
+
+    Ok(())
 }

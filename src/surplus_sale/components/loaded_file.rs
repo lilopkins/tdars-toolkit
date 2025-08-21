@@ -1,8 +1,13 @@
 use dioxus::prelude::*;
 use dioxus_primitives::tabs::{TabContent, TabList, TabTrigger, Tabs};
 
+#[cfg(feature = "escpos")]
+use crate::surplus_sale::ESCPOSDevice;
 use crate::surplus_sale::{
-    components::{Auction, AuditLog, Configure, Reconciliation, SalesOverview},
+    components::{
+        configure::ConfigurationUpdateData, Auction, AuditLog, Configure, Reconciliation,
+        SalesOverview,
+    },
     types::Datafile,
     NeedsSaving,
 };
@@ -16,6 +21,8 @@ pub struct LoadedFileProps {
 #[component]
 pub fn LoadedFile(props: LoadedFileProps) -> Element {
     let mut datafile: Signal<Datafile> = use_context_provider(|| props.loaded_file);
+    #[cfg(feature = "escpos")]
+    let mut escpos_device = use_context_provider(|| Signal::new(ESCPOSDevice(0x0000, 0x0000)));
     let mut needs_saving: Signal<NeedsSaving> = use_context();
     let configure_open = props.configure_open;
 
@@ -84,8 +91,14 @@ pub fn LoadedFile(props: LoadedFileProps) -> Element {
 
         Configure {
             open: configure_open,
-            on_update: move |(cur, club_taking)| {
-                datafile.write().set_currency(cur).set_club_taking(club_taking);
+            on_update: move |data: ConfigurationUpdateData| {
+                datafile.write().set_currency(data.currency).set_club_taking(data.club_taking);
+                #[cfg(feature = "escpos")]
+                {
+                    // deal with ESCPOD vendor and device
+                    escpos_device.write().0 = data.escpos_vendor;
+                    escpos_device.write().1 = data.escpos_device;
+                }
                 needs_saving.set(NeedsSaving(true));
             },
             datafile,
