@@ -54,13 +54,13 @@ pub fn SalesOverview() -> Element {
                             td { "{sym} {sold.hammer_price():0.02}" }
                             td { "{sold.buyer_callsign()}" }
                             td {
-                                if *sold.seller_reconciled() {
+                                if sold.seller_reconciled().is_some() {
                                     "✅"
                                 } else {
                                     "❌"
                                 }
                                 " / "
-                                if *sold.buyer_reconciled() {
+                                if sold.buyer_reconciled().is_some() {
                                     "✅"
                                 } else {
                                     "❌"
@@ -72,7 +72,7 @@ pub fn SalesOverview() -> Element {
 
                         if item.sold_details()
                             .as_ref()
-                            .is_some_and(|sold| *sold.buyer_reconciled() || *sold.seller_reconciled())
+                            .is_some_and(|sold| sold.buyer_reconciled().is_some() || sold.seller_reconciled().is_some())
                         {
                             td {}
                         } else {

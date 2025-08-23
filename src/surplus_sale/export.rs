@@ -1,3 +1,5 @@
+use crate::surplus_sale::types::ReconcileMethod;
+
 use super::types::Datafile;
 
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
@@ -72,7 +74,7 @@ fn create_transactions_sheet(
     let mut row = 5;
     for item in datafile.items() {
         if let Some(sold) = &item.sold_details() {
-            if *sold.buyer_reconciled() {
+            if sold.buyer_reconciled().is_some() {
                 let use_alt_format = row % 2 == 1;
                 let fmt_reg = if use_alt_format {
                     &alt_format
@@ -106,7 +108,7 @@ fn create_transactions_sheet(
                 row += 1;
             }
 
-            if *sold.seller_reconciled() {
+            if sold.seller_reconciled().is_some() {
                 let use_alt_format = row % 2 == 1;
                 let fmt_reg = if use_alt_format {
                     &alt_format
@@ -122,11 +124,12 @@ fn create_transactions_sheet(
                 worksheet.write_with_format(row, 1, item.lot_number(), fmt_reg)?;
                 worksheet.write_with_format(row, 2, item.description(), fmt_reg)?;
                 worksheet.write_with_format(row, 3, item.seller_callsign().to_string(), fmt_reg)?;
-                let hammer_less_club: BigDecimal = if *sold.seller_donated_to_club() {
-                    BigDecimal::zero()
-                } else {
-                    sold.hammer_price() * (1 - datafile.club_taking())
-                };
+                let hammer_less_club: BigDecimal =
+                    if *sold.seller_reconciled() == Some(ReconcileMethod::Donation) {
+                        BigDecimal::zero()
+                    } else {
+                        sold.hammer_price() * (1 - datafile.club_taking())
+                    };
                 worksheet.write_with_format(
                     row,
                     4,
@@ -134,7 +137,7 @@ fn create_transactions_sheet(
                     hammer_less_club.to_f64().unwrap(),
                     fmt_acc,
                 )?;
-                if *sold.seller_donated_to_club() {
+                if *sold.seller_reconciled() == Some(ReconcileMethod::Donation) {
                     worksheet.insert_note(
                         row,
                         4,

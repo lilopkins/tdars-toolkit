@@ -116,7 +116,7 @@ pub fn SurplusSale() -> Element {
                                 .await
                             {
                                 let data = path.read().await;
-                                match rmp_serde::from_read::<_, Datafile>(Cursor::new(data)) {
+                                match serde_json::from_reader::<_, Datafile>(Cursor::new(data)) {
                                     Ok(datafile_struct) => {
                                         datafile.set(datafile_struct);
                                         datafile_open.set(true);
@@ -153,7 +153,7 @@ pub fn SurplusSale() -> Element {
                                 clippy::unwrap_used,
                                 reason = "the ability to serialise the datafile is guaranteed"
                             )]
-                            let data = rmp_serde::to_vec(&datafile()).unwrap();
+                            let data = serde_json::to_vec(&datafile()).unwrap();
                             let date = Local::now().date_naive();
                             if let Some(handle) = rfd::AsyncFileDialog::new()
                                 .add_filter("TDARS auction", &["tdars_auction"])

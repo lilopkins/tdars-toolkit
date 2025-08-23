@@ -75,9 +75,9 @@ impl Datafile {
     pub fn delete_item(&mut self, lot_number: String) {
         self.items.retain(|i| {
             (*i.lot_number() != lot_number)
-                || i.sold_details()
-                    .as_ref()
-                    .is_some_and(|s| *s.buyer_reconciled() || *s.seller_reconciled())
+                || i.sold_details().as_ref().is_some_and(|s| {
+                    s.buyer_reconciled().is_some() || s.seller_reconciled().is_some()
+                })
         });
         self.audit_log
             .push(AuditEntry::new(AuditItem::RevokeItem { lot_number }));
@@ -162,7 +162,7 @@ impl Datafile {
         &mut self,
         callsign: &Callsign,
         mut reconcile_amount: BigDecimal,
-        donate_funds_to_club: bool,
+        reconcile_method: ReconcileMethod,
     ) -> BigDecimal {
         self.audit_log.push(AuditEntry::new(AuditItem::Reconciled {
             callsign: callsign.clone(),
@@ -179,15 +179,14 @@ impl Datafile {
             .filter_map(|i| {
                 // Item sold by CS
                 if let Some(sold) = &mut i.sold_details {
-                    if sold.seller_reconciled {
+                    if sold.seller_reconciled.is_some() {
                         return None;
                     }
                     let hammer_less_club: BigDecimal = sold.hammer_price() * (1 - ct.clone());
                     let amt = hammer_less_club;
                     reconcile_amount += amt.clone();
-                    sold.seller_reconciled = true;
-                    sold.seller_donated_to_club = donate_funds_to_club;
-                    if donate_funds_to_club {
+                    sold.seller_reconciled = Some(reconcile_method);
+                    if reconcile_method == ReconcileMethod::Donation {
                         return Some(AuditEntry::new(AuditItem::DonationToClub {
                             callsign: callsign.clone(),
                             amount: amt.clone(),
@@ -219,12 +218,12 @@ impl Datafile {
             .for_each(|i| {
                 // Item bought by CS
                 if let Some(sold) = &mut i.sold_details {
-                    if sold.buyer_reconciled {
+                    if sold.buyer_reconciled.is_some() {
                         return;
                     }
                     let amt = sold.hammer_price().clone();
                     reconcile_amount -= amt.clone();
-                    sold.buyer_reconciled = true;
+                    sold.buyer_reconciled = Some(ReconcileMethod::Cash);
                 }
             });
 
@@ -239,7 +238,9 @@ impl Datafile {
                 .push(AuditEntry::new(AuditItem::ReconciledFully {
                     callsign: callsign.clone(),
                 }));
-            if reconcile_amount > BigDecimal::zero() && !donate_funds_to_club {
+            if reconcile_amount > BigDecimal::zero()
+                && reconcile_method != ReconcileMethod::Donation
+            {
                 // Change returned
                 self.audit_log.push(AuditEntry::new(AuditItem::ChangeGiven {
                     callsign: callsign.clone(),
@@ -250,7 +251,7 @@ impl Datafile {
         }
 
         let change = reconcile_amount.max(BigDecimal::zero());
-        if change > BigDecimal::zero() && donate_funds_to_club {
+        if change > BigDecimal::zero() && reconcile_method == ReconcileMethod::Donation {
             // Donate change to club
             self.audit_log
                 .push(AuditEntry::new(AuditItem::DonationToClub {
@@ -295,9 +296,8 @@ impl Item {
         self.sold_details = Some(SoldDetails {
             hammer_price,
             buyer_callsign,
-            buyer_reconciled: false,
-            seller_reconciled: false,
-            seller_donated_to_club: false,
+            buyer_reconciled: None,
+            seller_reconciled: None,
         });
         self
     }
@@ -311,11 +311,25 @@ pub struct SoldDetails {
     /// The callsign of the buyer
     buyer_callsign: Callsign,
     /// Has the buyer reconciled against this item?
-    buyer_reconciled: bool,
+    buyer_reconciled: Option<ReconcileMethod>,
     /// Has the seller reconciled against this item?
-    seller_reconciled: bool,
-    /// Has the seller donated this item's value to the club?
-    seller_donated_to_club: bool,
+    seller_reconciled: Option<ReconcileMethod>,
+}
+
+/// How was the amount reconciled?
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq)]
+pub enum ReconcileMethod {
+    /// The buyer/seller (was) paid with cash
+    Cash,
+    /// The seller donated the funds to the club (seller only)
+    Donation,
+    /// The buyer/seller (was) paid by bank transfer
+    BankTransfer {
+        /// Was evidence of the bank transfer seen?
+        seen: bool,
+    },
+    /// The buyer/seller has agreed to pay at a later date
+    Postpone,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Getters)]

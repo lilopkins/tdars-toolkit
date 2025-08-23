@@ -14,7 +14,10 @@ use dioxus_primitives::{
 use crate::surplus_sale::types::Item;
 use crate::{
     components::CallsignEntry,
-    surplus_sale::{types::Datafile, NeedsSaving},
+    surplus_sale::{
+        types::{Datafile, ReconcileMethod},
+        NeedsSaving,
+    },
     types::Callsign,
 };
 
@@ -47,7 +50,7 @@ pub fn Reconciliation() -> Element {
                 *i.seller_callsign() == callsign()
                     && i.sold_details()
                         .as_ref()
-                        .is_some_and(|s| !s.seller_reconciled())
+                        .is_some_and(|s| s.seller_reconciled().is_none())
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -58,9 +61,9 @@ pub fn Reconciliation() -> Element {
             .items()
             .iter()
             .filter(|i| {
-                i.sold_details()
-                    .as_ref()
-                    .is_some_and(|s| *s.buyer_callsign() == callsign() && !s.buyer_reconciled())
+                i.sold_details().as_ref().is_some_and(|s| {
+                    *s.buyer_callsign() == callsign() && s.buyer_reconciled().is_none()
+                })
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -139,7 +142,7 @@ pub fn Reconciliation() -> Element {
                         class: "button",
                         disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
-                        onclick: move |_| reconcile(false),
+                        onclick: move |_| reconcile(ReconcileMethod::Cash),
                         "Reconcile"
                     }
                 }
@@ -148,7 +151,7 @@ pub fn Reconciliation() -> Element {
                         class: "button",
                         disabled: total() >= BigDecimal::zero() && reconcile_amount() <= total(),
                         "data-style": "primary",
-                        onclick: move |_| reconcile(true),
+                        onclick: move |_| reconcile(ReconcileMethod::Donation),
                         if total() > BigDecimal::zero() {
                             "Change to Club"
                         } else {
@@ -176,14 +179,7 @@ pub fn Reconciliation() -> Element {
                     onclick: move |_| {
                         #[cfg(feature = "escpos")]
                         {
-                            match print_receipt(
-                                escpos_device(),
-                                &callsign(),
-                                liability.read().as_ref(),
-                                items_sold.read().as_ref(),
-                                items_bought.read().as_ref(),
-                                datafile.read().club_taking(),
-                            ) {
+                            match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
                                 Ok(()) => {
                                     toast_api
                                         .info(
