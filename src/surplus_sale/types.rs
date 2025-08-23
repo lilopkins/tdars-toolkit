@@ -29,6 +29,8 @@ pub struct Datafile {
     items: Vec<Item>,
     /// A map of callsigns that still owe amounts
     callsign_liabilities: HashMap<Callsign, BigDecimal>,
+    /// A list of dontations to the club, callsign and amount
+    club_donations: Vec<(Callsign, BigDecimal)>,
     /// A list of entries for an audit log
     audit_log: Vec<AuditEntry>,
 }
@@ -46,6 +48,7 @@ impl Datafile {
             callsigns: vec![],
             items: vec![],
             callsign_liabilities: HashMap::new(),
+            club_donations: vec![],
             audit_log: vec![AuditEntry::new(AuditItem::Created {
                 currency,
                 club_taking_pct: club_taking * 100,
@@ -157,38 +160,49 @@ impl Datafile {
     /// club takes money, `reconcile_amount` should be positive.
     pub fn reconcile(
         &mut self,
-        callsign: Callsign,
+        callsign: &Callsign,
         mut reconcile_amount: BigDecimal,
-        all_funds_to_club: bool,
+        donate_funds_to_club: bool,
     ) -> BigDecimal {
         self.audit_log.push(AuditEntry::new(AuditItem::Reconciled {
             callsign: callsign.clone(),
             amount: reconcile_amount.clone(),
             currency: *self.currency(),
-            all_funds_to_club,
         }));
         let ct = self.club_taking().clone();
-
+        let curr = *self.currency();
         // Sold items first
-        self.items
+        let mut audit_items = self
+            .items
             .iter_mut()
-            .filter(|i| *i.seller_callsign() == callsign)
-            .for_each(|i| {
+            .filter(|i| i.seller_callsign() == callsign)
+            .filter_map(|i| {
                 // Item sold by CS
                 if let Some(sold) = &mut i.sold_details {
                     if sold.seller_reconciled {
-                        return;
+                        return None;
                     }
                     let hammer_less_club: BigDecimal = sold.hammer_price() * (1 - ct.clone());
                     let amt = hammer_less_club;
                     reconcile_amount += amt.clone();
                     sold.seller_reconciled = true;
-                    sold.seller_all_funds_to_club = all_funds_to_club;
+                    sold.seller_donated_to_club = donate_funds_to_club;
+                    if donate_funds_to_club {
+                        return Some(AuditEntry::new(AuditItem::DonationToClub {
+                            callsign: callsign.clone(),
+                            amount: amt.clone(),
+                            currency: curr,
+                        }));
+                    }
                 }
-            });
+                None
+            })
+            .collect::<Vec<_>>();
+
+        self.audit_log.append(&mut audit_items);
 
         // Liabilities at the highest point
-        if let Some(due) = self.callsign_liabilities.get_mut(&callsign) {
+        if let Some(due) = self.callsign_liabilities.get_mut(callsign) {
             let dues_paid = due.clone().min(reconcile_amount.clone());
             *due -= dues_paid.clone();
             reconcile_amount -= dues_paid;
@@ -200,7 +214,7 @@ impl Datafile {
             .filter(|i| {
                 i.sold_details()
                     .as_ref()
-                    .is_some_and(|s| *s.buyer_callsign() == callsign)
+                    .is_some_and(|s| s.buyer_callsign() == callsign)
             })
             .for_each(|i| {
                 // Item bought by CS
@@ -217,7 +231,7 @@ impl Datafile {
         if reconcile_amount < BigDecimal::zero() {
             // Store amount still owe
             self.callsign_liabilities
-                .entry(callsign)
+                .entry(callsign.clone())
                 .and_modify(|lia| *lia -= reconcile_amount.clone())
                 .or_insert(-reconcile_amount.clone());
         } else {
@@ -225,16 +239,30 @@ impl Datafile {
                 .push(AuditEntry::new(AuditItem::ReconciledFully {
                     callsign: callsign.clone(),
                 }));
-            if reconcile_amount > BigDecimal::zero() {
+            if reconcile_amount > BigDecimal::zero() && !donate_funds_to_club {
+                // Change returned
                 self.audit_log.push(AuditEntry::new(AuditItem::ChangeGiven {
-                    callsign,
+                    callsign: callsign.clone(),
                     amount: reconcile_amount.clone(),
                     currency: *self.currency(),
                 }));
             }
         }
 
-        reconcile_amount.max(BigDecimal::zero())
+        let change = reconcile_amount.max(BigDecimal::zero());
+        if change > BigDecimal::zero() && donate_funds_to_club {
+            // Donate change to club
+            self.audit_log
+                .push(AuditEntry::new(AuditItem::DonationToClub {
+                    callsign: callsign.clone(),
+                    amount: change.clone(),
+                    currency: *self.currency(),
+                }));
+            self.club_donations.push((callsign.clone(), change.clone()));
+            BigDecimal::zero()
+        } else {
+            change
+        }
     }
 }
 
@@ -269,7 +297,7 @@ impl Item {
             buyer_callsign,
             buyer_reconciled: false,
             seller_reconciled: false,
-            seller_all_funds_to_club: false,
+            seller_donated_to_club: false,
         });
         self
     }
@@ -286,9 +314,8 @@ pub struct SoldDetails {
     buyer_reconciled: bool,
     /// Has the seller reconciled against this item?
     seller_reconciled: bool,
-    /// Indicates that the seller opted for all revenue to go to the
-    /// club
-    seller_all_funds_to_club: bool,
+    /// Has the seller donated this item's value to the club?
+    seller_donated_to_club: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Getters)]
@@ -351,12 +378,17 @@ pub enum AuditItem {
         lot_number: String,
         description: String,
     },
-    #[display("{callsign} has reconciled {amount} {currency} (all funds going to the club: {all_funds_to_club:?})")]
+    #[display("{callsign} has reconciled {amount} {currency}")]
     Reconciled {
         callsign: Callsign,
         amount: BigDecimal,
         currency: Currency,
-        all_funds_to_club: bool,
+    },
+    #[display("{callsign} has donated {amount} {currency} to the club")]
+    DonationToClub {
+        callsign: Callsign,
+        amount: BigDecimal,
+        currency: Currency,
     },
     #[display("{callsign} has reconciled fully")]
     ReconciledFully { callsign: Callsign },

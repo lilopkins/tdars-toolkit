@@ -90,7 +90,7 @@ pub fn Reconciliation() -> Element {
         } else {
             reconcile_amount()
         };
-        let change = datafile.write().reconcile(callsign(), amt, to_club);
+        let change = datafile.write().reconcile(&callsign(), amt, to_club);
         if !change.is_zero() {
             toast_api.info(
                 format!("Change for {callsign}"),
@@ -146,10 +146,14 @@ pub fn Reconciliation() -> Element {
                 div { align_content: "end", margin_left: ".4rem",
                     button {
                         class: "button",
-                        disabled: total() >= BigDecimal::zero(),
+                        disabled: total() >= BigDecimal::zero() && reconcile_amount() <= total(),
                         "data-style": "primary",
                         onclick: move |_| reconcile(true),
-                        "Revenue to Club"
+                        if total() > BigDecimal::zero() {
+                            "Change to Club"
+                        } else {
+                            "Revenue to Club"
+                        }
                     }
                 }
             }
@@ -172,7 +176,14 @@ pub fn Reconciliation() -> Element {
                     onclick: move |_| {
                         #[cfg(feature = "escpos")]
                         {
-                            match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
+                            match print_receipt(
+                                escpos_device(),
+                                &callsign(),
+                                liability.read().as_ref(),
+                                items_sold.read().as_ref(),
+                                items_bought.read().as_ref(),
+                                datafile.read().club_taking(),
+                            ) {
                                 Ok(()) => {
                                     toast_api
                                         .info(

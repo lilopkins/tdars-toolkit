@@ -1,7 +1,7 @@
 use super::types::Datafile;
 
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
-use rust_xlsxwriter::{Format, FormatBorder, Formula, Workbook, XlsxError};
+use rust_xlsxwriter::{Format, FormatBorder, Formula, Note, Workbook, XlsxError};
 
 #[allow(
     clippy::unreadable_literal,
@@ -120,18 +120,9 @@ fn create_transactions_sheet(
                 };
 
                 worksheet.write_with_format(row, 1, item.lot_number(), fmt_reg)?;
-                if *sold.seller_all_funds_to_club() {
-                    worksheet.write_with_format(
-                        row,
-                        2,
-                        format!("{} (seller donated funds to club)", item.description()),
-                        fmt_reg,
-                    )?;
-                } else {
-                    worksheet.write_with_format(row, 2, item.description(), fmt_reg)?;
-                }
+                worksheet.write_with_format(row, 2, item.description(), fmt_reg)?;
                 worksheet.write_with_format(row, 3, item.seller_callsign().to_string(), fmt_reg)?;
-                let hammer_less_club: BigDecimal = if *sold.seller_all_funds_to_club() {
+                let hammer_less_club: BigDecimal = if *sold.seller_donated_to_club() {
                     BigDecimal::zero()
                 } else {
                     sold.hammer_price() * (1 - datafile.club_taking())
@@ -143,6 +134,15 @@ fn create_transactions_sheet(
                     hammer_less_club.to_f64().unwrap(),
                     fmt_acc,
                 )?;
+                if *sold.seller_donated_to_club() {
+                    worksheet.insert_note(
+                        row,
+                        4,
+                        &Note::new(
+                            "The seller of this item decided to donate the profit to the club.",
+                        ),
+                    )?;
+                }
                 worksheet.write_with_format(row, 5, "", fmt_reg)?;
                 worksheet.write_with_format(
                     row,
@@ -154,6 +154,40 @@ fn create_transactions_sheet(
                 row += 1;
             }
         }
+    }
+
+    for (cs, donation) in datafile.club_donations() {
+        let use_alt_format = row % 2 == 1;
+        let fmt_reg = if use_alt_format {
+            &alt_format
+        } else {
+            &regular_format
+        };
+        let fmt_acc = if use_alt_format {
+            &accounting_alt_format
+        } else {
+            &accounting_format
+        };
+
+        worksheet.write_with_format(row, 1, "", fmt_reg)?;
+        worksheet.write_with_format(row, 2, "Club donation", fmt_reg)?;
+        worksheet.write_with_format(row, 3, cs.to_string(), fmt_reg)?;
+        worksheet.write_with_format(row, 4, "", fmt_reg)?;
+        worksheet.write_with_format(
+            row,
+            5,
+            #[allow(clippy::unwrap_used, reason = "excel needs to deal with it!")]
+            donation.to_f64().unwrap(),
+            fmt_acc,
+        )?;
+        worksheet.write_with_format(
+            row,
+            6,
+            Formula::new(format!("=G{}-E{}+F{}", row, row + 1, row + 1)),
+            fmt_acc,
+        )?;
+
+        row += 1;
     }
 
     let use_alt_format = row % 2 == 1;
@@ -177,7 +211,7 @@ fn create_transactions_sheet(
     worksheet.write_with_format(row, 3, "", fmt_reg)?;
     worksheet.write_with_format(row, 4, "", fmt_reg)?;
     worksheet.write_with_format(row, 5, "", fmt_reg)?;
-    worksheet.write_with_format(row, 6, Formula::new(format!("=G{}", row - 1)), fmt_acc)?;
+    worksheet.write_with_format(row, 6, Formula::new(format!("=G{row}")), fmt_acc)?;
 
     Ok(())
 }
