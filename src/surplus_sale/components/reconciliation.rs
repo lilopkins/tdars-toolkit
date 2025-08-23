@@ -87,13 +87,13 @@ pub fn Reconciliation() -> Element {
     });
     use_effect(move || reconcile_amount.set(total().abs()));
 
-    let mut reconcile = move |to_club| {
+    let mut reconcile = move |method| {
         let amt = if total() < BigDecimal::zero() {
             -reconcile_amount()
         } else {
             reconcile_amount()
         };
-        let change = datafile.write().reconcile(&callsign(), amt, to_club);
+        let change = datafile.write().reconcile(&callsign(), amt, method);
         if !change.is_zero() {
             toast_api.info(
                 format!("Change for {callsign}"),
@@ -106,21 +106,12 @@ pub fn Reconciliation() -> Element {
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "1rem",
 
+            CallsignEntry {
+                suggestion_source: datafile.read().callsigns().clone(),
+                value: callsign,
+            }
+
             div { display: "flex", flex_direction: "row", gap: ".6rem",
-
-                CallsignEntry {
-                    suggestion_source: datafile.read().callsigns().clone(),
-                    value: callsign,
-                }
-
-                Separator {
-                    class: "separator",
-                    decorative: true,
-                    horizontal: false,
-                    height: "50px",
-                    margin_left: "1.5rem",
-                    margin_right: "1.5rem",
-                }
 
                 div { display: "flex", flex_direction: "column", gap: ".5rem",
                     Label { class: "label", html_for: "reconcile-amount", "Amount to Reconcile" }
@@ -143,7 +134,34 @@ pub fn Reconciliation() -> Element {
                         disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
                         onclick: move |_| reconcile(ReconcileMethod::Cash),
-                        "Reconcile"
+                        "Cash"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        disabled: total() == BigDecimal::zero(),
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer { seen: true }),
+                        "Bank Transfer (Seen)"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        disabled: total() == BigDecimal::zero(),
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer { seen: false }),
+                        "Bank Transfer (Unseen)"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        disabled: total() == BigDecimal::zero(),
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(ReconcileMethod::Postpone),
+                        "Reconcile with Postponed Payment"
                     }
                 }
                 div { align_content: "end", margin_left: ".4rem",

@@ -168,6 +168,7 @@ impl Datafile {
             callsign: callsign.clone(),
             amount: reconcile_amount.clone(),
             currency: *self.currency(),
+            method: reconcile_method,
         }));
         let ct = self.club_taking().clone();
         let curr = *self.currency();
@@ -223,7 +224,7 @@ impl Datafile {
                     }
                     let amt = sold.hammer_price().clone();
                     reconcile_amount -= amt.clone();
-                    sold.buyer_reconciled = Some(ReconcileMethod::Cash);
+                    sold.buyer_reconciled = Some(reconcile_method);
                 }
             });
 
@@ -317,18 +318,22 @@ pub struct SoldDetails {
 }
 
 /// How was the amount reconciled?
-#[derive(Serialize, Deserialize, Copy, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Display)]
 pub enum ReconcileMethod {
     /// The buyer/seller (was) paid with cash
+    #[display("Cash")]
     Cash,
     /// The seller donated the funds to the club (seller only)
+    #[display("Donation")]
     Donation,
     /// The buyer/seller (was) paid by bank transfer
+    #[display("Bank Xfr ({})", if *seen { "seen" } else { "unseen" })]
     BankTransfer {
         /// Was evidence of the bank transfer seen?
         seen: bool,
     },
     /// The buyer/seller has agreed to pay at a later date
+    #[display("Postponed")]
     Postpone,
 }
 
@@ -392,11 +397,12 @@ pub enum AuditItem {
         lot_number: String,
         description: String,
     },
-    #[display("{callsign} has reconciled {amount} {currency}")]
+    #[display("{callsign} has reconciled {amount} {currency} via {method}")]
     Reconciled {
         callsign: Callsign,
         amount: BigDecimal,
         currency: Currency,
+        method: ReconcileMethod,
     },
     #[display("{callsign} has donated {amount} {currency} to the club")]
     DonationToClub {
