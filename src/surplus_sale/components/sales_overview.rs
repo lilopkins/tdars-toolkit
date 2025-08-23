@@ -72,7 +72,9 @@ pub fn SalesOverview() -> Element {
 
                         if item.sold_details()
                             .as_ref()
-                            .is_some_and(|sold| sold.buyer_reconciled().is_some() || sold.seller_reconciled().is_some())
+                            .is_some_and(|sold| {
+                                sold.buyer_reconciled().is_some() || sold.seller_reconciled().is_some()
+                            })
                         {
                             td {}
                         } else {

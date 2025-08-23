@@ -142,7 +142,9 @@ pub fn Reconciliation() -> Element {
                         class: "button",
                         disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
-                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer { seen: true }),
+                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer {
+                            seen: true,
+                        }),
                         "Bank Transfer (Seen)"
                     }
                 }
@@ -151,7 +153,9 @@ pub fn Reconciliation() -> Element {
                         class: "button",
                         disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
-                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer { seen: false }),
+                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer {
+                            seen: false,
+                        }),
                         "Bank Transfer (Unseen)"
                     }
                 }
@@ -197,7 +201,14 @@ pub fn Reconciliation() -> Element {
                     onclick: move |_| {
                         #[cfg(feature = "escpos")]
                         {
-                            match print_receipt(escpos_device(), &callsign(), liability.read().as_ref(), items_sold.read().as_ref(), items_bought.read().as_ref(), datafile.read().club_taking()) {
+                            match print_receipt(
+                                escpos_device(),
+                                &callsign(),
+                                liability.read().as_ref(),
+                                items_sold.read().as_ref(),
+                                items_bought.read().as_ref(),
+                                datafile.read().club_taking(),
+                            ) {
                                 Ok(()) => {
                                     toast_api
                                         .info(
