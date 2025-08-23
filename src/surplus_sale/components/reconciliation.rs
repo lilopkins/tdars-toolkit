@@ -1,3 +1,5 @@
+#[cfg(feature = "escpos")]
+use std::time::Duration;
 use std::{cmp::Ordering, str::FromStr};
 
 use bigdecimal::{BigDecimal, Zero};
@@ -8,9 +10,14 @@ use dioxus_primitives::{
     toast::{use_toast, ToastOptions},
 };
 
+#[cfg(feature = "escpos")]
+use crate::surplus_sale::types::Item;
 use crate::{
     components::CallsignEntry,
-    surplus_sale::{types::Datafile, NeedsSaving},
+    surplus_sale::{
+        types::{Datafile, ReconcileMethod},
+        NeedsSaving,
+    },
     types::Callsign,
 };
 
@@ -21,6 +28,9 @@ pub fn Reconciliation() -> Element {
     let mut needs_saving: Signal<NeedsSaving> = use_context();
     let callsign = use_signal(Callsign::default);
     let mut reconcile_amount = use_signal(BigDecimal::zero);
+
+    #[cfg(feature = "escpos")]
+    let escpos_device: Signal<super::super::ESCPOSDevice> = use_context();
 
     let sym = use_memo(move || datafile.read().currency().symbol());
     let liability = use_memo(move || {
@@ -40,7 +50,7 @@ pub fn Reconciliation() -> Element {
                 *i.seller_callsign() == callsign()
                     && i.sold_details()
                         .as_ref()
-                        .is_some_and(|s| !s.seller_reconciled())
+                        .is_some_and(|s| s.seller_reconciled().is_none())
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -51,9 +61,9 @@ pub fn Reconciliation() -> Element {
             .items()
             .iter()
             .filter(|i| {
-                i.sold_details()
-                    .as_ref()
-                    .is_some_and(|s| *s.buyer_callsign() == callsign() && !s.buyer_reconciled())
+                i.sold_details().as_ref().is_some_and(|s| {
+                    *s.buyer_callsign() == callsign() && s.buyer_reconciled().is_none()
+                })
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -77,13 +87,13 @@ pub fn Reconciliation() -> Element {
     });
     use_effect(move || reconcile_amount.set(total().abs()));
 
-    let mut reconcile = move |to_club| {
+    let mut reconcile = move |method| {
         let amt = if total() < BigDecimal::zero() {
             -reconcile_amount()
         } else {
             reconcile_amount()
         };
-        let change = datafile.write().reconcile(callsign(), amt, to_club);
+        let change = datafile.write().reconcile(&callsign(), amt, method);
         if !change.is_zero() {
             toast_api.info(
                 format!("Change for {callsign}"),
@@ -96,21 +106,12 @@ pub fn Reconciliation() -> Element {
     rsx! {
         div { display: "flex", flex_direction: "column", gap: "1rem",
 
+            CallsignEntry {
+                suggestion_source: datafile.read().callsigns().clone(),
+                value: callsign,
+            }
+
             div { display: "flex", flex_direction: "row", gap: ".6rem",
-
-                CallsignEntry {
-                    suggestion_source: datafile.read().callsigns().clone(),
-                    value: callsign,
-                }
-
-                Separator {
-                    class: "separator",
-                    decorative: true,
-                    horizontal: false,
-                    height: "50px",
-                    margin_left: "1.5rem",
-                    margin_right: "1.5rem",
-                }
 
                 div { display: "flex", flex_direction: "column", gap: ".5rem",
                     Label { class: "label", html_for: "reconcile-amount", "Amount to Reconcile" }
@@ -132,17 +133,52 @@ pub fn Reconciliation() -> Element {
                         class: "button",
                         disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
-                        onclick: move |_| reconcile(false),
-                        "Reconcile"
+                        onclick: move |_| reconcile(ReconcileMethod::Cash),
+                        "Cash"
                     }
                 }
                 div { align_content: "end", margin_left: ".4rem",
                     button {
                         class: "button",
-                        disabled: total() >= BigDecimal::zero(),
+                        disabled: total() == BigDecimal::zero(),
                         "data-style": "primary",
-                        onclick: move |_| reconcile(true),
-                        "Revenue to Club"
+                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer {
+                            seen: true,
+                        }),
+                        "Bank Transfer (Seen)"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        disabled: total() == BigDecimal::zero(),
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(ReconcileMethod::BankTransfer {
+                            seen: false,
+                        }),
+                        "Bank Transfer (Unseen)"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        disabled: total() == BigDecimal::zero(),
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(ReconcileMethod::Postpone),
+                        "Reconcile with Postponed Payment"
+                    }
+                }
+                div { align_content: "end", margin_left: ".4rem",
+                    button {
+                        class: "button",
+                        disabled: total() >= BigDecimal::zero() && reconcile_amount() <= total(),
+                        "data-style": "primary",
+                        onclick: move |_| reconcile(ReconcileMethod::Donation),
+                        if total() > BigDecimal::zero() {
+                            "Change to Club"
+                        } else {
+                            "Revenue to Club"
+                        }
                     }
                 }
             }
@@ -157,6 +193,47 @@ pub fn Reconciliation() -> Element {
             }
 
             Separator { class: "separator", horizontal: true, decorative: true }
+
+            if cfg!(feature = "escpos") {
+                button {
+                    class: "button",
+                    "data-style": "primary",
+                    onclick: move |_| {
+                        #[cfg(feature = "escpos")]
+                        {
+                            match print_receipt(
+                                escpos_device(),
+                                &callsign(),
+                                liability.read().as_ref(),
+                                items_sold.read().as_ref(),
+                                items_bought.read().as_ref(),
+                                datafile.read().club_taking(),
+                            ) {
+                                Ok(()) => {
+                                    toast_api
+                                        .info(
+                                            "Receipt printing".to_string(),
+                                            ToastOptions::new()
+                                                .permanent(false)
+                                                .duration(Duration::from_secs(3)),
+                                        );
+                                }
+                                Err(e) => {
+                                    toast_api
+                                        .error(
+                                            "Failed to print".to_string(),
+                                            ToastOptions::new()
+                                                .permanent(false)
+                                                .duration(Duration::from_secs(5))
+                                                .description(format!("{e}")),
+                                        );
+                                }
+                            }
+                        }
+                    },
+                    "Print Receipt"
+                }
+            }
 
             table { class: "table",
                 thead {
@@ -223,4 +300,88 @@ pub fn Reconciliation() -> Element {
             }
         }
     }
+}
+
+#[cfg(feature = "escpos")]
+fn print_receipt(
+    device: super::super::ESCPOSDevice,
+    callsign: &Callsign,
+    liability: Option<&BigDecimal>,
+    sold: &Vec<Item>,
+    bought: &Vec<Item>,
+    club_taking: &BigDecimal,
+) -> escpos::errors::Result<()> {
+    use escpos::{
+        driver::UsbDriver,
+        printer::Printer,
+        printer_options::PrinterOptions,
+        utils::{JustifyMode, Protocol},
+    };
+
+    let driver = UsbDriver::open(device.0, device.1, None, None)?;
+    let mut prn = Printer::new(driver, Protocol::default(), Some(PrinterOptions::default()));
+    let prn = prn
+        .init()?
+        .reset()?
+        .smoothing(true)?
+        .bold(true)?
+        .size(2, 2)?
+        .justify(JustifyMode::CENTER)?
+        .writeln("Surplus Sale")?
+        .bold(false)?
+        .size(2, 1)?
+        .writeln(callsign.callsign())?
+        .reset_size()?
+        .justify(JustifyMode::LEFT)?
+        .feed()?
+        .feed()?;
+
+    let mut grand_total = BigDecimal::zero();
+
+    if let Some(liability) = liability {
+        grand_total += liability;
+        prn.justify(JustifyMode::LEFT)?
+            .writeln("Unpaid amounts")?
+            .justify(JustifyMode::RIGHT)?
+            .writeln(&format!("{liability:0.02}"))?
+            .feed()?;
+    }
+
+    for item in bought {
+        if let Some(sold) = item.sold_details() {
+            grand_total += sold.hammer_price();
+            prn.justify(JustifyMode::LEFT)?
+                .writeln(item.description())?
+                .justify(JustifyMode::RIGHT)?
+                .writeln(&format!("{:0.02}", sold.hammer_price()))?
+                .feed()?;
+        }
+    }
+
+    for item in sold {
+        if let Some(sold) = item.sold_details() {
+            grand_total -= sold.hammer_price() * (1 - club_taking);
+            prn.justify(JustifyMode::LEFT)?
+                .writeln(item.description())?
+                .justify(JustifyMode::RIGHT)?
+                .writeln(&format!("-{:0.02}", sold.hammer_price()))?
+                .justify(JustifyMode::LEFT)?
+                .writeln("  (less club taking)")?
+                .justify(JustifyMode::RIGHT)?
+                .writeln(&format!("{:0.02}", sold.hammer_price() * club_taking))?
+                .feed()?;
+        }
+    }
+
+    prn.size(1, 2)?
+        .justify(JustifyMode::LEFT)?
+        .writeln("Grand Total")?
+        .justify(JustifyMode::RIGHT)?
+        .writeln(&format!("{grand_total:0.02}"))?
+        .feed()?
+        .feed()?;
+
+    prn.partial_cut()?.print()?;
+
+    Ok(())
 }

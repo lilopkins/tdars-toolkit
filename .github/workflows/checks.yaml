@@ -11,8 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         checks:
-          - name: Code
+          - name: Code (with extra features)
             command: check --locked
+          - name: Code (without extra features)
+            command: check --locked --no-default-features -F desktop
           - name: Formatting
             component: rustfmt
             command: fmt --check
