@@ -1,6 +1,6 @@
 [package]
 name = "tdars-toolkit"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Lily Hopkins <lily@hpkns.uk>"]
 edition = "2021"
 
