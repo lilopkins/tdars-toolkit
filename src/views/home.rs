@@ -19,6 +19,10 @@ pub fn Home() -> Element {
             Link { to: Route::SurplusSale {},
                 button { class: "fat wide button", "data-style": "outline", "Run a Surplus Sale" }
             }
+
+            Link { to: Route::HamfestTable {},
+                button { class: "fat wide button", "data-style": "outline", "Run a Hamfest Club Table" }
+            }
         }
     }
 }

@@ -64,11 +64,6 @@ jobs:
             dx-name: windows
             target: x86_64-pc-windows-msvc
             bin: tmp-events-to-discord-amd64.exe
-          - os_name: macOS-x86_64
-            os: macOS-latest
-            dx-name: macos
-            target: x86_64-apple-darwin
-            bin: tmp-events-to-discord-darwin-amd64
           - os_name: macOS-aarch64
             os: macOS-latest
             dx-name: macos

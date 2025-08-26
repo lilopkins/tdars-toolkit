@@ -7,6 +7,7 @@
 // need dioxus
 use dioxus::prelude::*;
 
+use hamfest_table::prelude::*;
 use surplus_sale::prelude::*;
 use views::{Home, Navbar};
 
@@ -15,6 +16,7 @@ mod types;
 mod views;
 
 /// Modules for the TDARS Toolkit
+mod hamfest_table;
 mod surplus_sale;
 
 /// The Route enum is used to define the structure of internal routes in our app. All route enums need to derive
@@ -30,6 +32,8 @@ enum Route {
         Home {},
         #[route("/surplus-sale")]
         SurplusSale {},
+        #[route("/hamfest-table")]
+        HamfestTable {},
 }
 
 fn main() {
