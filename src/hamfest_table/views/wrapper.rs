@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use dioxus::{logger::tracing, prelude::*};
 use dioxus_primitives::toast::{use_toast, ToastOptions};
 
@@ -19,13 +21,16 @@ pub fn HamfestTable() -> Element {
                 reason = "the format is guaranteed to be serializable"
             )]
             let data = serde_json::to_vec(&datafile).unwrap();
-            tracing::debug!("Data produced");
             if let Some(handle) = handle.clone() {
-                // TODO Check if cloning here is okay
-                tracing::debug!("Handle cloned");
                 spawn(async move {
-                    let r = handle.write(&data).await;
-                    tracing::debug!("Written data: {r:?}");
+                    if handle.write(&data).await.is_ok() {
+                        toast_api.success(
+                            "Automatically saved".to_string(),
+                            ToastOptions::new()
+                                .permanent(false)
+                                .duration(Duration::from_secs(2)),
+                        );
+                    }
                 });
             }
         }
@@ -78,12 +83,40 @@ pub fn HamfestTable() -> Element {
                                         .error(
                                             "Failed to load session".to_string(),
                                             ToastOptions::default().description(format!("{e}")),
-                                        )
+                                        );
                                 }
                             }
                         }
                     },
                     "Open Session"
+                }
+                button {
+                    class: "fat wide button",
+                    "data-style": "outline",
+                    onclick: move |_| async move {
+                        if let Some(handle) = rfd::AsyncFileDialog::new()
+                            .add_filter("TDARS club table", &["tdars_club_table"])
+                            .pick_file()
+                            .await
+                        {
+                            let data = handle.read().await;
+
+                            match serde_json::from_slice::<Datafile>(&data) {
+                                Ok(loaded_data) => {
+                                    tracing::info!("Loaded session");
+                                    // TODO Create & Save log
+                                }
+                                Err(e) => {
+                                    toast_api
+                                        .error(
+                                            "Failed to load session".to_string(),
+                                            ToastOptions::default().description(format!("{e}")),
+                                        );
+                                }
+                            }
+                        }
+                    },
+                    "Transaction Log from Session"
                 }
             }
         }
