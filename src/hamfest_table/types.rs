@@ -54,7 +54,7 @@ impl Item {
 #[getset(get = "pub")]
 pub struct Receipt {
     timestamp: DateTime<Local>,
-    receipt_number: Uuid,
+    number: Uuid,
     #[getset(get_mut = "pub")]
     lines: Vec<ReceiptLine>,
 }
@@ -65,7 +65,7 @@ impl Receipt {
     pub fn new() -> Self {
         Self {
             timestamp: Local::now(),
-            receipt_number: Uuid::new_v4(),
+            number: Uuid::new_v4(),
             lines: vec![],
         }
     }

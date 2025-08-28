@@ -98,7 +98,7 @@ pub fn PrintDialog(props: PrintDialogProps) -> Element {
                         disabled: device().is_none(),
                         onclick: move |_| {
                             if let Some(receipt) = receipt.read().as_ref() {
-                                // SAFETY: button disabled if device is none
+                                #[allow(clippy::unwrap_used, reason = "button disabled if device is none")]
                                 if let Err(e) = print(receipt, device().unwrap()) {
                                     toast_api
                                         .error(
@@ -154,7 +154,7 @@ fn print(receipt: &Receipt, device: ESCPOSDevice) -> escpos::errors::Result<()> 
             ReceiptLine::Item { item } => {
                 grand_total += item.price();
                 prn.justify(JustifyMode::LEFT)?
-                    .writeln(&item.name())?
+                    .writeln(item.name())?
                     .justify(JustifyMode::RIGHT)?
                     .writeln(&format!("{:0.02}", item.price()))?
                     .feed()?;
@@ -186,10 +186,10 @@ fn print(receipt: &Receipt, device: ESCPOSDevice) -> escpos::errors::Result<()> 
     }
 
     prn.justify(JustifyMode::CENTER)?
-        .writeln(&format!("Receipt ID: {}", receipt.receipt_number()))?
+        .writeln(&format!("Receipt ID: {}", receipt.number()))?
         .feed()?;
     prn.justify(JustifyMode::CENTER)?
-        .writeln(&format!("{}", receipt.timestamp().to_rfc2822()))?
+        .writeln(&receipt.timestamp().to_rfc2822().to_string())?
         .feed()?;
     prn.justify(JustifyMode::CENTER)?
         .writeln("Thank you for your purchase!")?

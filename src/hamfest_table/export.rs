@@ -98,15 +98,9 @@ fn create_transactions_sheet(
 
             let method = match line {
                 ReceiptLine::Item { .. } => unreachable!(),
-                ReceiptLine::Payment { method, .. } => method,
-                ReceiptLine::Change { method, .. } => method,
+                ReceiptLine::Payment { method, .. } | ReceiptLine::Change { method, .. } => method,
             };
-            worksheet.write_with_format(
-                row,
-                COL_RCPT_NUM,
-                rcpt.receipt_number().to_string(),
-                fmt_reg,
-            )?;
+            worksheet.write_with_format(row, COL_RCPT_NUM, rcpt.number().to_string(), fmt_reg)?;
             worksheet.write_with_format(row, COL_DESC, line.to_string(), fmt_reg)?;
             worksheet.write_with_format(
                 row,

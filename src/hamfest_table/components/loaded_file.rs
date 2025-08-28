@@ -268,14 +268,14 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                             p {
                                 font_family: "monospace",
                                 text_align: "center",
-                                "Receipt: {receipt.receipt_number()}"
+                                "Receipt: {receipt.number()}"
                             }
                             for (idx , line) in receipt.lines().iter().enumerate() {
                                 div { onclick: move |_| receipt_selected.set(idx),
                                     ReceiptLineComponent {
                                         line: line.clone(),
                                         idx,
-                                        selected: receipt_selected.clone(),
+                                        selected: receipt_selected,
                                     }
                                 }
                             }
@@ -309,7 +309,7 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                                     .push(ReceiptLine::Payment {
                                         method: TransactionMethod::Card,
                                         amount: total,
-                                    })
+                                    });
                             }
                         },
                         "Card"
@@ -325,7 +325,7 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                                     .push(ReceiptLine::Payment {
                                         method: TransactionMethod::BankTransfer,
                                         amount: total,
-                                    })
+                                    });
                             }
                         },
                         "Bank Transfer"
@@ -341,18 +341,18 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                                     .push(ReceiptLine::Payment {
                                         method: TransactionMethod::Cheque,
                                         amount: total,
-                                    })
+                                    });
                             }
                         },
                         "Cheque"
                     }
-                    {print_dialog(receipt.clone())}
+                    {print_dialog(receipt)}
                     button {
                         class: "button",
                         "data-style": "primary",
                         onclick: move |_| {
                             receipt.set(None);
-                            receipt_selected.set(usize::MAX)
+                            receipt_selected.set(usize::MAX);
                         },
                         "Void Receipt"
                     }

@@ -40,7 +40,12 @@ pub fn HamfestTable() -> Element {
 
     rsx! {
         if file_open() {
-            LoadedFile { datafile: datafile.map_mut(|v| v.as_ref().unwrap(), |v| v.as_mut().unwrap()) }
+            LoadedFile {
+                datafile: {
+                    #[allow(clippy::unwrap_used, reason = "this is guaranteed by file_open")]
+                    datafile.map_mut(|v| v.as_ref().unwrap(), |v| v.as_mut().unwrap())
+                },
+            }
         } else {
             div { display: "flex", gap: ".5rem", flex_direction: "column",
 
@@ -122,7 +127,7 @@ pub fn HamfestTable() -> Element {
                                                 .await
                                             {
                                                 match handle.write(&data).await {
-                                                    Ok(_) => {
+                                                    Ok(()) => {
                                                         toast_api
                                                             .success(
                                                                 "Exported transactions".to_string(),
