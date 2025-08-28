@@ -33,3 +33,7 @@ impl std::hash::Hash for Callsign {
         self.callsign.hash(state);
     }
 }
+
+#[cfg(feature = "escpos")]
+#[derive(Copy, Clone, PartialEq)]
+pub struct ESCPOSDevice(pub u16, pub u16);

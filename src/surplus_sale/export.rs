@@ -116,7 +116,7 @@ fn create_transactions_sheet(
                 worksheet.write_with_format(
                     row,
                     COL_BAL,
-                    Formula::new(format!("=G{}-E{}+F{}", row, row + 1, row + 1)),
+                    Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
                     fmt_acc,
                 )?;
 
@@ -162,7 +162,7 @@ fn create_transactions_sheet(
                 worksheet.write_with_format(
                     row,
                     COL_BAL,
-                    Formula::new(format!("=G{}-E{}+F{}", row, row + 1, row + 1)),
+                    Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
                     fmt_acc,
                 )?;
 
@@ -199,7 +199,7 @@ fn create_transactions_sheet(
         worksheet.write_with_format(
             row,
             COL_BAL,
-            Formula::new(format!("=G{}-E{}+F{}", row, row + 1, row + 1)),
+            Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
             fmt_acc,
         )?;
 
@@ -228,7 +228,7 @@ fn create_transactions_sheet(
     worksheet.write_with_format(row, COL_METHOD, "", fmt_reg)?;
     worksheet.write_with_format(row, COL_DEBIT, "", fmt_reg)?;
     worksheet.write_with_format(row, COL_CREDIT, "", fmt_reg)?;
-    worksheet.write_with_format(row, COL_BAL, Formula::new(format!("=G{row}")), fmt_acc)?;
+    worksheet.write_with_format(row, COL_BAL, Formula::new(format!("=H{row}")), fmt_acc)?;
 
     Ok(())
 }

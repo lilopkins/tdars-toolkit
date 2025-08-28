@@ -1,8 +1,6 @@
 use dioxus::prelude::*;
 use dioxus_primitives::tabs::{TabContent, TabList, TabTrigger, Tabs};
 
-#[cfg(feature = "escpos")]
-use crate::surplus_sale::ESCPOSDevice;
 use crate::surplus_sale::{
     components::{
         configure::ConfigurationUpdateData, Auction, AuditLog, Configure, Reconciliation,
@@ -11,6 +9,8 @@ use crate::surplus_sale::{
     types::Datafile,
     NeedsSaving,
 };
+#[cfg(feature = "escpos")]
+use crate::types::ESCPOSDevice;
 
 #[derive(PartialEq, Clone, Props)]
 pub struct LoadedFileProps {

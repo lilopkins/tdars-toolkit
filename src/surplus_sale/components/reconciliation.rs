@@ -30,7 +30,7 @@ pub fn Reconciliation() -> Element {
     let mut reconcile_amount = use_signal(BigDecimal::zero);
 
     #[cfg(feature = "escpos")]
-    let escpos_device: Signal<super::super::ESCPOSDevice> = use_context();
+    let escpos_device: Signal<crate::types::ESCPOSDevice> = use_context();
 
     let sym = use_memo(move || datafile.read().currency().symbol());
     let liability = use_memo(move || {
@@ -304,7 +304,7 @@ pub fn Reconciliation() -> Element {
 
 #[cfg(feature = "escpos")]
 fn print_receipt(
-    device: super::super::ESCPOSDevice,
+    device: crate::types::ESCPOSDevice,
     callsign: &Callsign,
     liability: Option<&BigDecimal>,
     sold: &Vec<Item>,
