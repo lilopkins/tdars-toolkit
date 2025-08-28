@@ -1,18 +1,22 @@
-use std::{rc::Rc, str::FromStr, time::Duration};
+use std::{rc::Rc, str::FromStr};
 
 use bigdecimal::{BigDecimal, Zero};
 use dioxus::{logger::tracing, prelude::*};
 use dioxus_primitives::{
     label::Label,
     scroll_area::{ScrollArea, ScrollDirection},
-    toast::{use_toast, ToastOptions},
 };
 
-use crate::hamfest_table::types::{Datafile, Item, Receipt, ReceiptLine, TransactionMethod};
+use crate::{
+    hamfest_table::{
+        components::CashAndChangeDialog,
+        types::{Datafile, Item, Receipt, ReceiptLine, TransactionMethod},
+    },
+    Route,
+};
 
 #[component]
 pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>) -> Element {
-    let toast_api = use_toast();
     let mut barcode = use_signal(String::new);
     let mut barcode_elem: Signal<Option<Rc<MountedData>>> = use_signal(|| None);
 
@@ -96,6 +100,8 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
         }
     });
 
+    let mut cash_and_change_dialog_open = use_signal(|| false);
+
     rsx! {
         div {
             display: "flex",
@@ -106,6 +112,9 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                 flex_direction: "column",
                 gap: "1rem",
                 flex_grow: 1,
+                Link { to: Route::Home {},
+                    button { class: "button", "data-style": "outline", "← Main Menu" }
+                }
                 // Search input
                 div { display: "flex", gap: ".5rem",
                     div {
@@ -261,7 +270,7 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                                 text_align: "center",
                                 "Receipt: {receipt.receipt_number()}"
                             }
-                            for (idx, line) in receipt.lines().iter().enumerate() {
+                            for (idx , line) in receipt.lines().iter().enumerate() {
                                 div { onclick: move |_| receipt_selected.set(idx),
                                     ReceiptLineComponent {
                                         line: line.clone(),
@@ -285,10 +294,10 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                     button {
                         class: "button",
                         "data-style": "primary",
-                        onclick: // TODO Open cash&change dialog
-                        move |_| {},
+                        onclick: move |_| cash_and_change_dialog_open.set(true),
                         "Cash"
                     }
+                    CashAndChangeDialog { receipt, open: cash_and_change_dialog_open }
                     button {
                         class: "button",
                         "data-style": "primary",
@@ -337,32 +346,7 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
                         },
                         "Cheque"
                     }
-                    button {
-                        class: "button",
-                        "data-style": "primary",
-                        disabled: !cfg!(feature = "escpos"),
-                        onclick: move |_| {
-                            // TODO Open print dialog here instead
-                            if let Some(receipt) = receipt.read().as_ref() {
-                                if let Err(e) = print(receipt) {
-                                    toast_api
-                                        .error(
-                                            "Failed to print".to_string(),
-                                            ToastOptions::new()
-                                                .duration(Duration::from_secs(5))
-                                                .description(e),
-                                        );
-                                } else {
-                                    toast_api
-                                        .success(
-                                            "Printing".to_string(),
-                                            ToastOptions::new().duration(Duration::from_secs(3)),
-                                        );
-                                }
-                            }
-                        },
-                        "Print"
-                    }
+                    {print_dialog(receipt.clone())}
                     button {
                         class: "button",
                         "data-style": "primary",
@@ -425,18 +409,25 @@ fn ReceiptLineComponent(line: ReceiptLine, idx: usize, selected: Signal<usize>) 
     }
 }
 
+#[cfg(feature = "escpos")]
+pub fn print_dialog(receipt: Signal<Option<Receipt>>) -> Element {
+    use crate::hamfest_table::components::PrintDialog;
+
+    let mut open = use_signal(|| false);
+    rsx! {
+        button {
+            class: "button",
+            "data-style": "primary",
+            disabled: receipt.read().is_none(),
+            onclick: move |_| open.set(true),
+
+            "Print"
+        }
+        PrintDialog { receipt, open }
+    }
+}
+
 #[cfg(not(feature = "escpos"))]
-fn print(_receipt: &Receipt) -> Result<(), String> {
-    Err("The software hasn't been compiled with the `escpos` feature.".to_string())
-}
-
-#[cfg(feature = "escpos")]
-fn print(receipt: &Receipt) -> Result<(), String> {
-    print_inner(receipt).map_err(|e| format!("{e}"))
-}
-
-#[cfg(feature = "escpos")]
-fn print_inner(receipt: &Receipt) -> escpos::errors::Result<()> {
-    // TODO
-    Ok(())
+pub fn print_dialog(_receipt: Signal<Receipt>) -> Element {
+    rsx! {}
 }

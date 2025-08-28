@@ -90,12 +90,12 @@ pub enum ReceiptLine {
     Item {
         item: Item,
     },
-    #[display("Payment for {amount:0.02} via {method}")]
+    #[display("Payment via {method}")]
     Payment {
         method: TransactionMethod,
         amount: BigDecimal,
     },
-    #[display("Change for {amount:0.02} via {method}")]
+    #[display("Change via {method}")]
     Change {
         method: TransactionMethod,
         amount: BigDecimal,

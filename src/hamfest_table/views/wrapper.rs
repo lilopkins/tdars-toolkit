@@ -4,7 +4,9 @@ use dioxus::{logger::tracing, prelude::*};
 use dioxus_primitives::toast::{use_toast, ToastOptions};
 
 use crate::hamfest_table::components::LoadedFile;
+use crate::hamfest_table::export::export;
 use crate::hamfest_table::types::Datafile;
+use crate::Route;
 
 #[component]
 pub fn HamfestTable() -> Element {
@@ -104,7 +106,40 @@ pub fn HamfestTable() -> Element {
                             match serde_json::from_slice::<Datafile>(&data) {
                                 Ok(loaded_data) => {
                                     tracing::info!("Loaded session");
-                                    // TODO Create & Save log
+                                    match export(&loaded_data) {
+                                        Err(e) => {
+                                            toast_api
+                                                .error(
+                                                    "Failed to create workbook".to_string(),
+                                                    ToastOptions::default().description(format!("{e}")),
+                                                );
+                                        }
+                                        Ok(data) => {
+                                            if let Some(handle) = rfd::AsyncFileDialog::new()
+                                                .add_filter("Excel workbooks", &["xlsx"])
+                                                .set_file_name("transactions.xlsx")
+                                                .save_file()
+                                                .await
+                                            {
+                                                match handle.write(&data).await {
+                                                    Ok(_) => {
+                                                        toast_api
+                                                            .success(
+                                                                "Exported transactions".to_string(),
+                                                                ToastOptions::default(),
+                                                            );
+                                                    }
+                                                    Err(e) => {
+                                                        toast_api
+                                                            .error(
+                                                                "Failed to write workbook".to_string(),
+                                                                ToastOptions::default().description(format!("{e}")),
+                                                            );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     toast_api
@@ -117,6 +152,9 @@ pub fn HamfestTable() -> Element {
                         }
                     },
                     "Transaction Log from Session"
+                }
+                Link { to: Route::Home {},
+                    button { class: "fat wide button", "data-style": "outline", "← Main Menu" }
                 }
             }
         }
