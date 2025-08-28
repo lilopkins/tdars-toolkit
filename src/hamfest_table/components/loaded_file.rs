@@ -428,6 +428,6 @@ pub fn print_dialog(receipt: Signal<Option<Receipt>>) -> Element {
 }
 
 #[cfg(not(feature = "escpos"))]
-pub fn print_dialog(_receipt: Signal<Receipt>) -> Element {
+pub fn print_dialog(_receipt: Signal<Option<Receipt>>) -> Element {
     rsx! {}
 }
