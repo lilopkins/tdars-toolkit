@@ -1159,6 +1159,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dioxus-sdk"
+version = "0.7.0-rc.0"
+source = "git+https://github.com/ealmloff/dioxus-std.git?branch=0.7#5abb45906c47b4c864e1c06a3e6aebb1b5cae03c"
+dependencies = [
+ "dioxus-time",
+]
+
+[[package]]
 name = "dioxus-signals"
 version = "0.7.0-rc.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1200,7 +1208,7 @@ dependencies = [
 [[package]]
 name = "dioxus-time"
 version = "0.7.0-rc.0"
-source = "git+https://github.com/ealmloff/dioxus-std?branch=0.7#5abb45906c47b4c864e1c06a3e6aebb1b5cae03c"
+source = "git+https://github.com/ealmloff/dioxus-std.git?branch=0.7#5abb45906c47b4c864e1c06a3e6aebb1b5cae03c"
 dependencies = [
  "dioxus",
  "futures",
@@ -4510,6 +4518,7 @@ dependencies = [
  "derive_more 2.0.1",
  "dioxus",
  "dioxus-primitives",
+ "dioxus-sdk",
  "escpos",
  "getset",
  "iso_currency",

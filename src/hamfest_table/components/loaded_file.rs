@@ -1,4 +1,4 @@
-use std::{rc::Rc, str::FromStr};
+use std::{rc::Rc, str::FromStr, time::Duration};
 
 use bigdecimal::{BigDecimal, Zero};
 use dioxus::{logger::tracing, prelude::*};
@@ -6,6 +6,7 @@ use dioxus_primitives::{
     label::Label,
     scroll_area::{ScrollArea, ScrollDirection},
 };
+use dioxus_sdk::time::use_debounce;
 
 use crate::{
     hamfest_table::{
@@ -39,27 +40,31 @@ pub fn LoadedFile(datafile: MappedMutSignal<Datafile, Signal<Option<Datafile>>>)
     };
 
     let mut item = use_signal(Item::default);
+    let mut debounce_load_item =
+        use_debounce(Duration::from_millis(500), move |barcode: String| {
+            receipt_selected.set(usize::MAX);
+            if barcode.is_empty() {
+                item.set(Item::default());
+            } else {
+                // Try to fetch item from barcode
+                if let Some(df_item) = datafile
+                    .peek()
+                    .items()
+                    .iter()
+                    .find(|i| *i.barcode() == barcode)
+                {
+                    tracing::info!("Barcode changed and item found! {df_item}");
+                    item.set(df_item.clone());
+                } else {
+                    tracing::info!("Barcode changed to nonexistant item.");
+                    item.set(Item::default());
+                }
+            }
+        });
     use_effect(move || {
         // Reload item details from barcode
         let barcode = barcode();
-        receipt_selected.set(usize::MAX);
-        if barcode.is_empty() {
-            item.set(Item::default());
-        } else {
-            // Try to fetch item from barcode
-            if let Some(df_item) = datafile
-                .peek()
-                .items()
-                .iter()
-                .find(|i| *i.barcode() == barcode)
-            {
-                tracing::info!("Barcode changed and item found! {df_item}");
-                item.set(df_item.clone());
-            } else {
-                tracing::info!("Barcode changed to nonexistant item.");
-                item.set(Item::default());
-            }
-        }
+        debounce_load_item.action(barcode);
     });
     use_effect(move || {
         // Update item when details changed/created
