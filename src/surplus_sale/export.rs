@@ -17,6 +17,7 @@ const COL_METHOD: u16 = 4;
 const COL_DEBIT: u16 = 5;
 const COL_CREDIT: u16 = 6;
 const COL_BAL: u16 = 7;
+const COL_CASH_BAL: u16 = 8;
 
 pub fn export(datafile: &Datafile) -> Result<Vec<u8>, XlsxError> {
     let mut workbook = Workbook::new();
@@ -65,7 +66,8 @@ fn create_transactions_sheet(
         .set_column_width(COL_METHOD, 20)?
         .set_column_width(COL_DEBIT, 10)?
         .set_column_width(COL_CREDIT, 10)?
-        .set_column_width(COL_BAL, 10)?;
+        .set_column_width(COL_BAL, 10)?
+        .set_column_width(COL_CASH_BAL, 10)?;
 
     worksheet.write_with_format(1, 1, "Transactions", &title_format)?;
 
@@ -76,9 +78,11 @@ fn create_transactions_sheet(
     worksheet.write_with_format(3, COL_DEBIT, "Debit", &table_heading_format)?;
     worksheet.write_with_format(3, COL_CREDIT, "Credit", &table_heading_format)?;
     worksheet.write_with_format(3, COL_BAL, "Balance", &table_heading_format)?;
+    worksheet.write_with_format(3, COL_CASH_BAL, "Cash Bal", &table_heading_format)?;
 
     worksheet.write_with_format(4, COL_DESC, "Opening balance", &open_closing_balance_format)?;
     worksheet.write_with_format(4, COL_BAL, 0, &accounting_format)?;
+    worksheet.write_with_format(4, COL_CASH_BAL, 0, &accounting_format)?;
 
     let mut row = 5;
     for item in datafile.items() {
@@ -117,6 +121,16 @@ fn create_transactions_sheet(
                     row,
                     COL_BAL,
                     Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
+                    fmt_acc,
+                )?;
+                worksheet.write_with_format(
+                    row,
+                    COL_CASH_BAL,
+                    if *method == ReconcileMethod::Cash {
+                        Formula::new(format!("=I{}-F{}+G{}", row, row + 1, row + 1))
+                    } else {
+                        Formula::new(format!("=I{row}"))
+                    },
                     fmt_acc,
                 )?;
 
@@ -165,6 +179,16 @@ fn create_transactions_sheet(
                     Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
                     fmt_acc,
                 )?;
+                worksheet.write_with_format(
+                    row,
+                    COL_CASH_BAL,
+                    if *method == ReconcileMethod::Cash {
+                        Formula::new(format!("=I{}-F{}+G{}", row, row + 1, row + 1))
+                    } else {
+                        Formula::new(format!("=I{row}"))
+                    },
+                    fmt_acc,
+                )?;
 
                 row += 1;
             }
@@ -202,6 +226,12 @@ fn create_transactions_sheet(
             Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
             fmt_acc,
         )?;
+        worksheet.write_with_format(
+            row,
+            COL_CASH_BAL,
+            Formula::new(format!("=I{row}")),
+            fmt_acc,
+        )?;
 
         row += 1;
     }
@@ -229,6 +259,7 @@ fn create_transactions_sheet(
     worksheet.write_with_format(row, COL_DEBIT, "", fmt_reg)?;
     worksheet.write_with_format(row, COL_CREDIT, "", fmt_reg)?;
     worksheet.write_with_format(row, COL_BAL, Formula::new(format!("=H{row}")), fmt_acc)?;
+    worksheet.write_with_format(row, COL_CASH_BAL, Formula::new(format!("=I{row}")), fmt_acc)?;
 
     Ok(())
 }
