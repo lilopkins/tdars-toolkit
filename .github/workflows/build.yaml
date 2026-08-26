@@ -102,8 +102,17 @@ jobs:
         id: build-bundles
         shell: bash
         run: |
-          dx bundle --release --features bundle --json-output --verbose | tee .dx-bundle-output
-          BUNDLES=$(cat .dx-bundle-output | tail -1 | sed 's/\x1b\[?25h//g' | jq -r '.json | fromjson | .BundleOutput.bundles []')
+          if [ "${{ matrix.platform.os }}" = "ubuntu-latest" ]; then
+            dx bundle --release --features bundle --verbose --package-types deb --package-types rpm
+            BUNDLES=$(find target/dx -type f -path '*/bundle/*' \( -name '*.deb' -o -name '*.rpm' \))
+          elif [ "${{ matrix.platform.os }}" = "windows-latest" ]; then
+            dx bundle --release --features bundle --verbose --package-types nsis
+            BUNDLES=$(find target/dx -type f -path '*/bundle/*' -name '*.exe')
+          else
+            dx bundle --release --features bundle --verbose
+            BUNDLES=$(find target/dx -type f -path '*/bundle/*' \( -name '*.dmg' -o -name '*.pkg' -o -name '*.app.tar.gz' \))
+          fi
+
           echo "BUNDLES<<EOF" >> $GITHUB_OUTPUT
           echo "$BUNDLES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
