@@ -12,7 +12,7 @@ pub fn Home() -> Element {
             div { text_align: "center",
                 h1 { margin_bottom: 0, "TDARS Toolkit" }
                 p { margin_top: 0,
-                    "by Lily Hopkins 2E0HPS for the Telford & District ARS (v{version})"
+                    "by Lily Hopkins M1HPS for the Telford & District ARS (v{version})"
                 }
             }
 
