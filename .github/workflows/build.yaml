@@ -8,7 +8,7 @@ on:
 
 env:
   EXECUTABLE_NAME: tdars-toolkit
-  DIOXUS_VERSION: 0.7.0-rc.0
+  DIOXUS_VERSION: 0.7
 
 jobs:
   create-release:
@@ -95,7 +95,7 @@ jobs:
         shell: bash
         run: |
           cargo install cargo-binstall
-          cargo binstall -y dioxus-cli@=${{ steps.env.outputs.DIOXUS_VERSION }}
+          cargo binstall -y dioxus-cli@${{ steps.env.outputs.DIOXUS_VERSION }}
       - name: Checkout
         uses: actions/checkout@v3
       - name: Build bundle
