@@ -126,6 +126,13 @@ pub fn HamfestTable() -> Element {
                                                 .save_file()
                                                 .await
                                             {
+                                                #[cfg(not(target_arch = "wasm32"))]
+                                                let handle = {
+                                                    let mut path: std::path::PathBuf = handle.into();
+                                                    path.set_extension("xlsx");
+                                                    rfd::FileHandle::from(path)
+                                                };
+
                                                 match handle.write(&data).await {
                                                     Ok(()) => {
                                                         toast_api

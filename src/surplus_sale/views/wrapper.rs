@@ -265,6 +265,13 @@ pub fn SurplusSale() -> Element {
                                             );
                                     }
                                     Ok(data) => {
+                                        #[cfg(not(target_arch = "wasm32"))]
+                                        let handle = {
+                                            let mut path: std::path::PathBuf = handle.into();
+                                            path.set_extension("xlsx");
+                                            rfd::FileHandle::from(path)
+                                        };
+
                                         if let Err(e) = handle.write(&data).await {
                                             toast_api
                                                 .error(
