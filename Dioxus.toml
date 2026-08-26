@@ -6,7 +6,6 @@ identifier = "uk.hpkns"
 publisher = "Hpkns"
 icon = [
     "icons/icon.png",
-    "icons/icon.ico",
     "icons/icon.icns",
 ]
 category = "Utility"

@@ -27,7 +27,7 @@ pub struct ConfigurationUpdateData {
 pub struct ConfigureProps {
     open: Signal<bool>,
     on_update: EventHandler<ConfigurationUpdateData>,
-    datafile: ReadOnlySignal<Datafile>,
+    datafile: ReadSignal<Datafile>,
 }
 
 #[component]
