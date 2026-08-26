@@ -19,6 +19,15 @@ const COL_CREDIT: u16 = 6;
 const COL_BAL: u16 = 7;
 const COL_CASH_BAL: u16 = 8;
 
+#[derive(Clone)]
+struct BuyerTransactionRow {
+    lot_number: String,
+    description: String,
+    party: String,
+    method: ReconcileMethod,
+    credit: BigDecimal,
+}
+
 pub fn export(datafile: &Datafile) -> Result<Vec<u8>, XlsxError> {
     let mut workbook = Workbook::new();
 
@@ -87,53 +96,60 @@ fn create_transactions_sheet(
     let mut row = 5;
     for item in datafile.items() {
         if let Some(sold) = &item.sold_details() {
-            if let Some(method) = sold.buyer_reconciled() {
-                let use_alt_format = row % 2 == 1;
-                let fmt_reg = if use_alt_format {
-                    &alt_format
-                } else {
-                    &regular_format
-                };
-                let fmt_acc = if use_alt_format {
-                    &accounting_alt_format
-                } else {
-                    &accounting_format
-                };
-
-                worksheet.write_with_format(row, COL_LOT, item.lot_number(), fmt_reg)?;
-                worksheet.write_with_format(row, COL_DESC, item.description(), fmt_reg)?;
-                worksheet.write_with_format(
+            if let Some(liability) = datafile.callsign_liabilities().get(sold.buyer_callsign()) {
+                if let Some(item_payments) = liability.item_payment(item.lot_number()) {
+                    for payment in item_payments.payments() {
+                        write_buyer_row(
+                            worksheet,
+                            &alt_format,
+                            &regular_format,
+                            &accounting_alt_format,
+                            &accounting_format,
+                            row,
+                            &BuyerTransactionRow {
+                                lot_number: item.lot_number().clone(),
+                                description: item_payments.description().clone(),
+                                party: sold.buyer_callsign().to_string(),
+                                method: *payment.method(),
+                                credit: payment.amount().clone(),
+                            },
+                        )?;
+                        row += 1;
+                    }
+                } else if let Some(method) = sold.buyer_reconciled() {
+                    write_buyer_row(
+                        worksheet,
+                        &alt_format,
+                        &regular_format,
+                        &accounting_alt_format,
+                        &accounting_format,
+                        row,
+                        &BuyerTransactionRow {
+                            lot_number: item.lot_number().clone(),
+                            description: item.description().clone(),
+                            party: sold.buyer_callsign().to_string(),
+                            method: *method,
+                            credit: sold.hammer_price().clone(),
+                        },
+                    )?;
+                    row += 1;
+                }
+            } else if let Some(method) = sold.buyer_reconciled() {
+                write_buyer_row(
+                    worksheet,
+                    &alt_format,
+                    &regular_format,
+                    &accounting_alt_format,
+                    &accounting_format,
                     row,
-                    COL_PARTY,
-                    sold.buyer_callsign().to_string(),
-                    fmt_reg,
-                )?;
-                worksheet.write_with_format(row, COL_DEBIT, "", fmt_reg)?;
-                worksheet.write_with_format(row, COL_METHOD, method.to_string(), fmt_reg)?;
-                worksheet.write_with_format(
-                    row,
-                    COL_CREDIT,
-                    #[allow(clippy::unwrap_used, reason = "excel needs to deal with it!")]
-                    sold.hammer_price().to_f64().unwrap(),
-                    fmt_acc,
-                )?;
-                worksheet.write_with_format(
-                    row,
-                    COL_BAL,
-                    Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
-                    fmt_acc,
-                )?;
-                worksheet.write_with_format(
-                    row,
-                    COL_CASH_BAL,
-                    if *method == ReconcileMethod::Cash {
-                        Formula::new(format!("=I{}-F{}+G{}", row, row + 1, row + 1))
-                    } else {
-                        Formula::new(format!("=I{row}"))
+                    &BuyerTransactionRow {
+                        lot_number: item.lot_number().clone(),
+                        description: item.description().clone(),
+                        party: sold.buyer_callsign().to_string(),
+                        method: *method,
+                        credit: sold.hammer_price().clone(),
                     },
-                    fmt_acc,
                 )?;
-
                 row += 1;
             }
 
@@ -264,6 +280,59 @@ fn create_transactions_sheet(
     Ok(())
 }
 
+fn write_buyer_row(
+    worksheet: &mut rust_xlsxwriter::Worksheet,
+    alt_format: &Format,
+    regular_format: &Format,
+    accounting_alt_format: &Format,
+    accounting_format: &Format,
+    row: u32,
+    buyer_row: &BuyerTransactionRow,
+) -> Result<(), XlsxError> {
+    let use_alt_format = row % 2 == 1;
+    let fmt_reg = if use_alt_format {
+        alt_format
+    } else {
+        regular_format
+    };
+    let fmt_acc = if use_alt_format {
+        accounting_alt_format
+    } else {
+        accounting_format
+    };
+
+    worksheet.write_with_format(row, COL_LOT, &buyer_row.lot_number, fmt_reg)?;
+    worksheet.write_with_format(row, COL_DESC, &buyer_row.description, fmt_reg)?;
+    worksheet.write_with_format(row, COL_PARTY, &buyer_row.party, fmt_reg)?;
+    worksheet.write_with_format(row, COL_DEBIT, "", fmt_reg)?;
+    worksheet.write_with_format(row, COL_METHOD, buyer_row.method.to_string(), fmt_reg)?;
+    worksheet.write_with_format(
+        row,
+        COL_CREDIT,
+        #[allow(clippy::unwrap_used, reason = "excel needs to deal with it!")]
+        buyer_row.credit.to_f64().unwrap(),
+        fmt_acc,
+    )?;
+    worksheet.write_with_format(
+        row,
+        COL_BAL,
+        Formula::new(format!("=H{}-F{}+G{}", row, row + 1, row + 1)),
+        fmt_acc,
+    )?;
+    worksheet.write_with_format(
+        row,
+        COL_CASH_BAL,
+        if buyer_row.method == ReconcileMethod::Cash {
+            Formula::new(format!("=I{}-F{}+G{}", row, row + 1, row + 1))
+        } else {
+            Formula::new(format!("=I{row}"))
+        },
+        fmt_acc,
+    )?;
+
+    Ok(())
+}
+
 fn create_audit_sheet(workbook: &mut Workbook, datafile: &Datafile) -> Result<(), XlsxError> {
     let title_format = Format::new().set_bold().set_font_size(28.);
     let table_heading_format = Format::new()
@@ -312,4 +381,59 @@ fn create_audit_sheet(workbook: &mut Workbook, datafile: &Datafile) -> Result<()
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use bigdecimal::BigDecimal;
+
+    use crate::surplus_sale::types::{Datafile, Item, ReconcileMethod};
+    use crate::types::Callsign;
+
+    #[test]
+    fn split_payment_is_stored_in_liabilities_for_export() {
+        let mut datafile = Datafile::new();
+
+        let mut seller = Callsign::default();
+        seller
+            .set_callsign("M0SELL".to_string())
+            .set_name("Seller".to_string());
+        let mut buyer = Callsign::default();
+        buyer
+            .set_callsign("M0BUY".to_string())
+            .set_name("Buyer".to_string());
+
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let mut item = Item::new("M0SELL-1".to_string(), seller, "Rig".to_string());
+        item.sold(BigDecimal::from_str("10.00").unwrap(), buyer.clone());
+        datafile.push_item(item);
+        datafile.reconcile(
+            &buyer,
+            BigDecimal::from_str("5.00").unwrap(),
+            ReconcileMethod::Cash,
+        );
+        datafile.reconcile(
+            &buyer,
+            BigDecimal::from_str("5.00").unwrap(),
+            ReconcileMethod::BankTransfer { seen: true },
+        );
+
+        let liability = datafile
+            .callsign_liabilities()
+            .get(&buyer)
+            .expect("buyer liability should exist");
+        let item_rows = liability
+            .item_payment("M0SELL-1")
+            .expect("split payment rows should exist");
+
+        assert_eq!(item_rows.payments().len(), 2);
+        assert!(*item_rows.payments()[0].method() == ReconcileMethod::Cash);
+        assert!(*item_rows.payments()[1].method() == ReconcileMethod::BankTransfer { seen: true });
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let expected = BigDecimal::from_str("5.00").unwrap();
+        assert_eq!(item_rows.payments()[0].amount(), &expected);
+        assert_eq!(item_rows.payments()[1].amount(), &expected);
+    }
 }

@@ -21,6 +21,13 @@ use crate::{
     types::Callsign,
 };
 
+#[derive(Clone, PartialEq)]
+struct OutstandingBoughtItem {
+    lot_number: String,
+    description: String,
+    amount: BigDecimal,
+}
+
 #[component]
 pub fn Reconciliation() -> Element {
     let toast_api = use_toast();
@@ -33,13 +40,12 @@ pub fn Reconciliation() -> Element {
     let escpos_device: Signal<crate::types::ESCPOSDevice> = use_context();
 
     let sym = use_memo(move || datafile.read().currency().symbol());
-    let liability = use_memo(move || {
+    let unmatched_liability = use_memo(move || {
         datafile
             .read()
             .callsign_liabilities()
             .get(&callsign())
-            .cloned()
-            .clone()
+            .map_or_else(BigDecimal::zero, |liability| liability.amount().clone())
     });
     let items_sold = use_memo(move || {
         datafile
@@ -55,30 +61,16 @@ pub fn Reconciliation() -> Element {
             .cloned()
             .collect::<Vec<_>>()
     });
-    let items_bought = use_memo(move || {
-        datafile
-            .read()
-            .items()
-            .iter()
-            .filter(|i| {
-                i.sold_details().as_ref().is_some_and(|s| {
-                    *s.buyer_callsign() == callsign() && s.buyer_reconciled().is_none()
-                })
-            })
-            .cloned()
-            .collect::<Vec<_>>()
-    });
+    let items_bought = use_memo(move || outstanding_bought_items(&datafile.read(), &callsign()));
 
     // + => callsign pays club
     // - => club pays callsign
     let total = use_memo(move || {
-        let mut total = liability().unwrap_or_else(BigDecimal::zero);
-        for item in &items_bought() {
-            if let Some(sold) = item.sold_details() {
-                total += sold.hammer_price();
-            }
+        let mut total = unmatched_liability();
+        for item in items_bought.read().iter() {
+            total += item.amount.clone();
         }
-        for item in &items_sold() {
+        for item in items_sold.read().iter() {
             if let Some(sold) = item.sold_details() {
                 total -= sold.hammer_price() * (1 - datafile().club_taking());
             }
@@ -204,7 +196,7 @@ pub fn Reconciliation() -> Element {
                             match print_receipt(
                                 escpos_device(),
                                 &callsign(),
-                                liability.read().as_ref(),
+                                &unmatched_liability(),
                                 items_sold.read().as_ref(),
                                 items_bought.read().as_ref(),
                                 datafile.read().club_taking(),
@@ -245,28 +237,22 @@ pub fn Reconciliation() -> Element {
                     }
                 }
                 tbody {
-                    if let Some(liability) = liability() {
-                        if !liability.is_zero() {
+                    if !unmatched_liability().is_zero() {
                             tr {
                                 td {}
                                 td {
                                     em { "Unpaid owing" }
                                 }
-                                td { "-{sym} {liability:0.02}" }
-                                td { "-{sym} {liability:0.02}" }
+                                td { "-{sym} {unmatched_liability():0.02}" }
+                                td { "-{sym} {unmatched_liability():0.02}" }
                             }
-                        }
                     }
-                    for item in &items_bought() {
+                    for item in items_bought.read().iter() {
                         tr {
-                            td { "{item.lot_number()}" }
-                            td { "{item.description()}" }
-                            if let Some(sold) = item.sold_details() {
-                                td { "-{sym} {sold.hammer_price():0.02}" }
-                                td { "-{sym} {sold.hammer_price():0.02}" }
-                            } else {
-                                td { colspan: 3, "not sold" }
-                            }
+                            td { "{item.lot_number}" }
+                            td { "{item.description}" }
+                            td { "-{sym} {item.amount:0.02}" }
+                            td { "-{sym} {item.amount:0.02}" }
                         }
                     }
                     for item in &items_sold() {
@@ -306,9 +292,9 @@ pub fn Reconciliation() -> Element {
 fn print_receipt(
     device: crate::types::ESCPOSDevice,
     callsign: &Callsign,
-    liability: Option<&BigDecimal>,
+    liability: &BigDecimal,
     sold: &Vec<Item>,
-    bought: &Vec<Item>,
+    bought: &Vec<OutstandingBoughtItem>,
     club_taking: &BigDecimal,
 ) -> escpos::errors::Result<()> {
     use escpos::{
@@ -338,7 +324,7 @@ fn print_receipt(
 
     let mut grand_total = BigDecimal::zero();
 
-    if let Some(liability) = liability {
+    if !liability.is_zero() {
         grand_total += liability;
         prn.justify(JustifyMode::LEFT)?
             .writeln("Unpaid amounts")?
@@ -348,14 +334,12 @@ fn print_receipt(
     }
 
     for item in bought {
-        if let Some(sold) = item.sold_details() {
-            grand_total += sold.hammer_price();
-            prn.justify(JustifyMode::LEFT)?
-                .writeln(item.description())?
-                .justify(JustifyMode::RIGHT)?
-                .writeln(&format!("{:0.02}", sold.hammer_price()))?
-                .feed()?;
-        }
+        grand_total += &item.amount;
+        prn.justify(JustifyMode::LEFT)?
+            .writeln(&item.description)?
+            .justify(JustifyMode::RIGHT)?
+            .writeln(&format!("{:0.02}", item.amount))?
+            .feed()?;
     }
 
     for item in sold {
@@ -384,4 +368,54 @@ fn print_receipt(
     prn.partial_cut()?.print()?;
 
     Ok(())
+}
+
+fn outstanding_bought_items(
+    datafile: &Datafile,
+    callsign: &Callsign,
+) -> Vec<OutstandingBoughtItem> {
+    let tracked = datafile
+        .callsign_liabilities()
+        .get(callsign)
+        .map(|liability| {
+            liability
+                .item_payments()
+                .iter()
+                .filter(|item| !item.remaining().is_zero())
+                .map(|item| {
+                    (
+                        item.lot_number().clone(),
+                        OutstandingBoughtItem {
+                            lot_number: item.lot_number().clone(),
+                            description: item.description().clone(),
+                            amount: item.remaining().clone(),
+                        },
+                    )
+                })
+                .collect::<std::collections::HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let mut tracked = tracked;
+    let mut outstanding = vec![];
+
+    for item in datafile.items() {
+        if let Some(sold) = item.sold_details() {
+            if sold.buyer_callsign() != callsign {
+                continue;
+            }
+
+            if let Some(item) = tracked.remove(item.lot_number()) {
+                outstanding.push(item);
+            } else if sold.buyer_reconciled().is_none() {
+                outstanding.push(OutstandingBoughtItem {
+                    lot_number: item.lot_number().clone(),
+                    description: item.description().clone(),
+                    amount: sold.hammer_price().clone(),
+                });
+            }
+        }
+    }
+
+    outstanding.extend(tracked.into_values());
+    outstanding
 }

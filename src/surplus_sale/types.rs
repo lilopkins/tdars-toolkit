@@ -28,11 +28,181 @@ pub struct Datafile {
     /// A sorted (by lot number) list of items from the auction
     items: Vec<Item>,
     /// A map of callsigns that still owe amounts
-    callsign_liabilities: HashMap<Callsign, BigDecimal>,
+    #[serde(default, with = "callsign_liabilities_serde")]
+    callsign_liabilities: HashMap<Callsign, CallsignLiability>,
     /// A list of dontations to the club, callsign and amount
     club_donations: Vec<(Callsign, BigDecimal)>,
     /// A list of entries for an audit log
     audit_log: Vec<AuditEntry>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Getters, Default)]
+#[getset(get = "pub")]
+pub struct CallsignLiability {
+    /// Outstanding amounts not tied to a specific item
+    #[serde(default)]
+    amount: BigDecimal,
+    /// Payment history and remaining balances for bought items
+    #[serde(default)]
+    item_payments: Vec<BuyerLiabilityItem>,
+}
+
+impl CallsignLiability {
+    #[must_use]
+    pub fn total(&self) -> BigDecimal {
+        self.item_payments
+            .iter()
+            .fold(self.amount.clone(), |acc, item| acc + item.remaining())
+    }
+
+    #[must_use]
+    pub fn item_payment(&self, lot_number: &str) -> Option<&BuyerLiabilityItem> {
+        self.item_payments
+            .iter()
+            .find(|item| item.lot_number() == lot_number)
+    }
+
+    fn upsert_item_payment(
+        &mut self,
+        lot_number: String,
+        description: String,
+        remaining: BigDecimal,
+    ) -> &mut BuyerLiabilityItem {
+        if let Some(idx) = self
+            .item_payments
+            .iter()
+            .position(|item| item.lot_number() == &lot_number)
+        {
+            return &mut self.item_payments[idx];
+        }
+
+        self.item_payments.push(BuyerLiabilityItem {
+            lot_number,
+            description,
+            remaining,
+            payments: vec![],
+        });
+        #[allow(clippy::unwrap_used, reason = "entry was just inserted")]
+        self.item_payments.last_mut().unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Getters)]
+#[getset(get = "pub")]
+pub struct BuyerLiabilityItem {
+    /// The lot number this liability applies to
+    lot_number: String,
+    /// The item description at the point of reconciliation
+    description: String,
+    /// The amount still outstanding for this item
+    #[serde(default)]
+    remaining: BigDecimal,
+    /// Payments made against this item
+    #[serde(default)]
+    payments: Vec<BuyerLiabilityPayment>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Getters)]
+#[getset(get = "pub")]
+pub struct BuyerLiabilityPayment {
+    /// The amount paid in this transaction
+    amount: BigDecimal,
+    /// How the amount was reconciled
+    method: ReconcileMethod,
+}
+
+mod callsign_liabilities_serde {
+    use std::collections::HashMap;
+
+    use bigdecimal::BigDecimal;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::{BuyerLiabilityItem, CallsignLiability};
+    use crate::types::Callsign;
+
+    #[derive(Serialize, Deserialize)]
+    struct LiabilityEntry {
+        callsign: Callsign,
+        amount: BigDecimal,
+        #[serde(default)]
+        item_payments: Vec<BuyerLiabilityItem>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum LiabilityEncoding {
+        EntryList(Vec<LiabilityEntry>),
+        StringMap(HashMap<String, BigDecimal>),
+    }
+
+    pub fn serialize<S>(
+        liabilities: &HashMap<Callsign, CallsignLiability>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let entries = liabilities
+            .iter()
+            .map(|(callsign, liability)| LiabilityEntry {
+                callsign: callsign.clone(),
+                amount: liability.amount().clone(),
+                item_payments: liability.item_payments().clone(),
+            })
+            .collect::<Vec<_>>();
+        entries.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<HashMap<Callsign, CallsignLiability>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let encoding = LiabilityEncoding::deserialize(deserializer)?;
+
+        match encoding {
+            LiabilityEncoding::EntryList(entries) => Ok(entries
+                .into_iter()
+                .map(|entry| {
+                    (
+                        entry.callsign,
+                        CallsignLiability {
+                            amount: entry.amount,
+                            item_payments: entry.item_payments,
+                        },
+                    )
+                })
+                .collect::<HashMap<_, _>>()),
+            LiabilityEncoding::StringMap(entries) => entries
+                .into_iter()
+                .map(|(key, amount)| {
+                    parse_key(&key).map(|callsign| {
+                        (
+                            callsign,
+                            CallsignLiability {
+                                amount,
+                                item_payments: vec![],
+                            },
+                        )
+                    })
+                })
+                .collect::<Result<HashMap<_, _>, _>>()
+                .map_err(serde::de::Error::custom),
+        }
+    }
+
+    fn parse_key(key: &str) -> Result<Callsign, String> {
+        if let Ok(callsign) = serde_json::from_str::<Callsign>(key) {
+            return Ok(callsign);
+        }
+
+        if key.trim().is_empty() {
+            return Err("callsign liability key cannot be empty".to_string());
+        }
+
+        Ok(Callsign::default().with_callsign(key.to_string()))
+    }
 }
 
 impl Datafile {
@@ -73,11 +243,18 @@ impl Datafile {
 
     /// Delete an item if it is not at all reconciled.
     pub fn delete_item(&mut self, lot_number: String) {
+        let has_recorded_payments = self.callsign_liabilities.values().any(|liability| {
+            liability
+                .item_payments()
+                .iter()
+                .any(|item| item.lot_number() == &lot_number && !item.payments().is_empty())
+        });
         self.items.retain(|i| {
             (*i.lot_number() != lot_number)
                 || i.sold_details().as_ref().is_some_and(|s| {
                     s.buyer_reconciled().is_some() || s.seller_reconciled().is_some()
                 })
+                || has_recorded_payments
         });
         self.audit_log
             .push(AuditEntry::new(AuditItem::RevokeItem { lot_number }));
@@ -158,6 +335,7 @@ impl Datafile {
     ///
     /// If the club pays out, `reconcile_amount` should be negative. Inverseley if the
     /// club takes money, `reconcile_amount` should be positive.
+    #[allow(clippy::too_many_lines, reason = "reconciliation is kept in one place")]
     pub fn reconcile(
         &mut self,
         callsign: &Callsign,
@@ -201,10 +379,15 @@ impl Datafile {
 
         self.audit_log.append(&mut audit_items);
 
-        // Liabilities at the highest point
-        if let Some(due) = self.callsign_liabilities.get_mut(callsign) {
-            let dues_paid = due.clone().min(reconcile_amount.clone());
-            *due -= dues_paid.clone();
+        let mut liability = self
+            .callsign_liabilities
+            .remove(callsign)
+            .unwrap_or_default();
+
+        // Legacy/unmatched liabilities at the highest point
+        if reconcile_amount > BigDecimal::zero() {
+            let dues_paid = liability.amount().clone().min(reconcile_amount.clone());
+            liability.amount -= dues_paid.clone();
             reconcile_amount -= dues_paid;
         }
 
@@ -217,24 +400,62 @@ impl Datafile {
                     .is_some_and(|s| s.buyer_callsign() == callsign)
             })
             .for_each(|i| {
+                let lot_number = i.lot_number().clone();
+                let description = i.description().clone();
+
                 // Item bought by CS
                 if let Some(sold) = &mut i.sold_details {
-                    if sold.buyer_reconciled.is_some() {
+                    if sold.buyer_reconciled.is_some()
+                        && liability.item_payment(&lot_number).is_none()
+                    {
                         return;
                     }
-                    let amt = sold.hammer_price().clone();
-                    reconcile_amount -= amt.clone();
-                    sold.buyer_reconciled = Some(reconcile_method);
+
+                    if reconcile_amount <= BigDecimal::zero() {
+                        return;
+                    }
+
+                    let entry = liability.upsert_item_payment(
+                        lot_number,
+                        description,
+                        sold.hammer_price().clone(),
+                    );
+                    let paid = entry.remaining().clone().min(reconcile_amount.clone());
+                    if paid <= BigDecimal::zero() {
+                        return;
+                    }
+
+                    entry.payments.push(BuyerLiabilityPayment {
+                        amount: paid.clone(),
+                        method: reconcile_method,
+                    });
+                    entry.remaining -= paid.clone();
+                    reconcile_amount -= paid;
+
+                    if entry.remaining().is_zero() {
+                        sold.buyer_reconciled = Some(reconcile_method);
+                    }
                 }
             });
 
-        if reconcile_amount < BigDecimal::zero() {
-            // Store amount still owe
-            self.callsign_liabilities
-                .entry(callsign.clone())
-                .and_modify(|lia| *lia -= reconcile_amount.clone())
-                .or_insert(-reconcile_amount.clone());
-        } else {
+        let still_owed = self
+            .items
+            .iter()
+            .filter(|i| {
+                i.sold_details().as_ref().is_some_and(|s| {
+                    s.buyer_callsign() == callsign
+                        && s.buyer_reconciled().is_none()
+                        && liability.item_payment(i.lot_number()).is_none()
+                })
+            })
+            .fold(liability.total(), |acc, i| {
+                acc + i
+                    .sold_details()
+                    .as_ref()
+                    .map_or_else(BigDecimal::zero, |sold| sold.hammer_price().clone())
+            });
+
+        if still_owed.is_zero() {
             self.audit_log
                 .push(AuditEntry::new(AuditItem::ReconciledFully {
                     callsign: callsign.clone(),
@@ -261,8 +482,16 @@ impl Datafile {
                     currency: *self.currency(),
                 }));
             self.club_donations.push((callsign.clone(), change.clone()));
+            if !liability.amount().is_zero() || !liability.item_payments().is_empty() {
+                self.callsign_liabilities
+                    .insert(callsign.clone(), liability);
+            }
             BigDecimal::zero()
         } else {
+            if !liability.amount().is_zero() || !liability.item_payments().is_empty() {
+                self.callsign_liabilities
+                    .insert(callsign.clone(), liability);
+            }
             change
         }
     }
@@ -420,4 +649,168 @@ pub enum AuditItem {
     },
     #[display("The lot {lot_number} has been revoked.")]
     RevokeItem { lot_number: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use bigdecimal::BigDecimal;
+    use serde_json::json;
+
+    use super::{CallsignLiability, Datafile, Item, ReconcileMethod};
+    use crate::types::Callsign;
+
+    #[test]
+    fn liabilities_roundtrip_via_entry_list() {
+        let mut datafile = Datafile::new();
+        let mut callsign = Callsign::default();
+        callsign
+            .set_callsign("M0AAA".to_string())
+            .set_name("Alice".to_string());
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let amount = BigDecimal::from_str("12.50").unwrap();
+        datafile.callsign_liabilities.insert(
+            callsign.clone(),
+            CallsignLiability {
+                amount: amount.clone(),
+                item_payments: vec![],
+            },
+        );
+
+        #[allow(clippy::unwrap_used, reason = "test serialization should succeed")]
+        let encoded = serde_json::to_value(&datafile).unwrap();
+        assert!(encoded["callsign_liabilities"].is_array());
+
+        #[allow(clippy::unwrap_used, reason = "test roundtrip should succeed")]
+        let decoded: Datafile = serde_json::from_value(encoded).unwrap();
+        let liability = decoded
+            .callsign_liabilities()
+            .get(&callsign)
+            .expect("liability should roundtrip");
+        assert_eq!(liability.amount(), &amount);
+    }
+
+    #[test]
+    fn liabilities_deserialise_legacy_string_map() {
+        let encoded = json!({
+            "auction_date": "2026-01-01T00:00:00+00:00",
+            "club_taking": "0.1",
+            "currency": "GBP",
+            "callsigns": [],
+            "items": [],
+            "callsign_liabilities": {
+                "M0BBB": "3.75"
+            },
+            "club_donations": [],
+            "audit_log": []
+        });
+
+        #[allow(clippy::unwrap_used, reason = "legacy fixture should deserialize")]
+        let decoded: Datafile = serde_json::from_value(encoded).unwrap();
+        let callsign = Callsign::default().with_callsign("M0BBB".to_string());
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let expected = BigDecimal::from_str("3.75").unwrap();
+        let liability = decoded
+            .callsign_liabilities()
+            .get(&callsign)
+            .expect("legacy liability should deserialize");
+        assert_eq!(liability.amount(), &expected);
+        assert!(liability.item_payments().is_empty());
+    }
+
+    #[test]
+    fn split_payment_liability_can_be_saved() {
+        let mut datafile = Datafile::new();
+
+        let mut seller = Callsign::default();
+        seller
+            .set_callsign("M0SELL".to_string())
+            .set_name("Seller".to_string());
+        let mut buyer = Callsign::default();
+        buyer
+            .set_callsign("M0BUY".to_string())
+            .set_name("Buyer".to_string());
+
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let mut item = Item::new("M0SELL-1".to_string(), seller, "Rig".to_string());
+        item.sold(BigDecimal::from_str("10.00").unwrap(), buyer.clone());
+        datafile.push_item(item);
+        datafile.reconcile(
+            &buyer,
+            BigDecimal::from_str("5.00").unwrap(),
+            ReconcileMethod::Cash,
+        );
+
+        let liability = datafile
+            .callsign_liabilities()
+            .get(&buyer)
+            .expect("split payment liability should exist");
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let expected = BigDecimal::from_str("5.00").unwrap();
+        assert_eq!(liability.total(), expected);
+
+        #[allow(
+            clippy::unwrap_used,
+            reason = "split payment datafile should serialize"
+        )]
+        let encoded = serde_json::to_vec(&datafile).unwrap();
+        assert!(!encoded.is_empty());
+    }
+
+    #[test]
+    fn partial_buyer_payment_stays_unreconciled_until_fully_paid() {
+        let mut datafile = Datafile::new();
+
+        let mut seller = Callsign::default();
+        seller
+            .set_callsign("M0SELL".to_string())
+            .set_name("Seller".to_string());
+        let mut buyer = Callsign::default();
+        buyer
+            .set_callsign("M0BUY".to_string())
+            .set_name("Buyer".to_string());
+
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let mut item = Item::new("M0SELL-1".to_string(), seller, "Rig".to_string());
+        item.sold(BigDecimal::from_str("10.00").unwrap(), buyer.clone());
+        datafile.push_item(item);
+        datafile.reconcile(
+            &buyer,
+            BigDecimal::from_str("5.00").unwrap(),
+            ReconcileMethod::Cash,
+        );
+
+        let sold = datafile.items()[0]
+            .sold_details()
+            .as_ref()
+            .expect("sold details should exist");
+        assert!(sold.buyer_reconciled().is_none());
+
+        let liability = datafile
+            .callsign_liabilities()
+            .get(&buyer)
+            .expect("split payment liability should exist");
+        assert_eq!(liability.item_payments().len(), 1);
+        #[allow(clippy::unwrap_used, reason = "test data is valid")]
+        let remaining = BigDecimal::from_str("5.00").unwrap();
+        assert_eq!(liability.item_payments()[0].remaining(), &remaining);
+
+        datafile.reconcile(
+            &buyer,
+            BigDecimal::from_str("5.00").unwrap(),
+            ReconcileMethod::BankTransfer { seen: true },
+        );
+
+        let sold = datafile.items()[0]
+            .sold_details()
+            .as_ref()
+            .expect("sold details should exist");
+        assert!(sold.buyer_reconciled() == &Some(ReconcileMethod::BankTransfer { seen: true }));
+        let liability = datafile
+            .callsign_liabilities()
+            .get(&buyer)
+            .expect("split payment liability should exist");
+        assert_eq!(liability.item_payments()[0].payments().len(), 2);
+    }
 }
