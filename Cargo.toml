@@ -13,7 +13,7 @@ derive_more = { version = "2.1.1", features = ["display"] }
 # Also change dioxus version in CI build job
 dioxus = { version = "0.7", features = ["router"] }
 dioxus-sdk = { version = "0.7", features = ["time"] }
-dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1" }
+dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false, features = ["router"] }
 escpos = { version = "0.19.1", optional = true, features = ["usb"] }
 getset = "0.1.7"
 iso_currency = { version = "0.7.0", features = ["with-serde"] }
