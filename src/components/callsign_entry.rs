@@ -12,7 +12,7 @@ use crate::types::Callsign;
 pub struct CallsignEntryProps {
     /// The list of callsigns that can be used as suggestions
     #[props(into, default = use_signal(Vec::new))]
-    suggestion_source: ReadOnlySignal<Vec<Callsign>>,
+    suggestion_source: ReadSignal<Vec<Callsign>>,
     /// A bi-directional signal with the value of the callsign
     #[props(into, default = use_signal(Callsign::default))]
     value: Signal<Callsign>,
