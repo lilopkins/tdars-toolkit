@@ -148,12 +148,20 @@ pub fn SurplusSale() -> Element {
                         on_select: move |_| async move {
                             tracing::info!("Saving...");
 
-                            #[allow(
-                                // Button is disabled when this doesn't unwrap
-                                clippy::unwrap_used,
-                                reason = "the ability to serialise the datafile is guaranteed"
-                            )]
-                            let data = serde_json::to_vec(&datafile()).unwrap();
+                            let data = match serde_json::to_vec(&datafile()) {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    toast_api
+                                        .error(
+                                            "Failed to save".to_string(),
+                                            ToastOptions::new()
+                                                .description(format!("{e}"))
+                                                .permanent(false)
+                                                .duration(ERROR_DURATION),
+                                        );
+                                    return;
+                                }
+                            };
                             let date = Local::now().date_naive();
                             if let Some(handle) = rfd::AsyncFileDialog::new()
                                 .add_filter("TDARS auction", &["tdars_auction"])
@@ -257,6 +265,13 @@ pub fn SurplusSale() -> Element {
                                             );
                                     }
                                     Ok(data) => {
+                                        #[cfg(not(target_arch = "wasm32"))]
+                                        let handle = {
+                                            let mut path: std::path::PathBuf = handle.into();
+                                            path.set_extension("xlsx");
+                                            rfd::FileHandle::from(path)
+                                        };
+
                                         if let Err(e) = handle.write(&data).await {
                                             toast_api
                                                 .error(

@@ -27,14 +27,14 @@ pub fn SalesOverview() -> Element {
             }
             tbody {
                 for (callsign , liability) in datafile.read().callsign_liabilities() {
-                    if !liability.is_zero() {
+                    if !liability.total().is_zero() {
                         tr { key: "{callsign}",
                             td {}
                             td {
                                 em { "Unpaid amounts" }
                             }
                             td {}
-                            td { "{sym} {liability:0.02}" }
+                            td { "{sym} {liability.total():0.02}" }
                             td { "{callsign}" }
                             td { colspan: 2 }
                         }
