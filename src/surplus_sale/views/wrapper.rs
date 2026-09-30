@@ -180,6 +180,11 @@ pub fn SurplusSale() -> Element {
                                         );
                                 } else {
                                     needs_saving.set(NeedsSaving(false));
+                                    toast_api
+                                        .success(
+                                            "Saved".to_string(),
+                                            ToastOptions::new().permanent(false).duration(INFO_DURATION),
+                                        );
                                 }
                             }
 
